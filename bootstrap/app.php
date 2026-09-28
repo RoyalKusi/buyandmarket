@@ -1,10 +1,13 @@
 <?php
 
 use App\Http\Middleware\ScopeQueriesToActingSeller;
+use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
+use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Session\Middleware\StartSession;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -21,6 +24,15 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'seller.scope' => ScopeQueriesToActingSeller::class,
+        ]);
+
+        // Unconditional session support (no CSRF) for guest-cart/checkout
+        // API routes — see the comment in routes/api.php for why
+        // Sanctum's own conditional session middleware isn't enough here.
+        $middleware->appendToGroup('guest-session', [
+            EncryptCookies::class,
+            AddQueuedCookiesToResponse::class,
+            StartSession::class,
         ]);
 
         // TDD §8.5: "a seller's API token cannot retrieve another seller's

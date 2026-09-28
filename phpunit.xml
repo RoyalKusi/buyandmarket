@@ -29,5 +29,9 @@
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="PESEPAY_INTEGRATION_KEY" value="test-pesepay-integration-key"/>
+        <env name="PESEPAY_ENCRYPTION_KEY" value="01234567890123456789012345678901"/>
+        <env name="PAYNOW_INTEGRATION_ID" value="test-paynow-id"/>
+        <env name="PAYNOW_INTEGRATION_KEY" value="test-paynow-integration-key"/>
     </php>
 </phpunit>

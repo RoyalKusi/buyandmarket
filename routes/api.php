@@ -4,12 +4,16 @@ use App\Http\Controllers\Api\V1\Admin\BrandModerationController;
 use App\Http\Controllers\Api\V1\Admin\KycReviewController;
 use App\Http\Controllers\Api\V1\Admin\ProductModerationController;
 use App\Http\Controllers\Api\V1\Admin\RoleAssignmentController;
+use App\Http\Controllers\Api\V1\CartController;
 use App\Http\Controllers\Api\V1\CategoryController;
+use App\Http\Controllers\Api\V1\CheckoutController;
 use App\Http\Controllers\Api\V1\KycDocumentController;
+use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\Seller\BrandController as SellerBrandController;
 use App\Http\Controllers\Api\V1\Seller\OnboardingController as SellerOnboardingController;
 use App\Http\Controllers\Api\V1\Seller\ProductController as SellerProductController;
+use App\Http\Controllers\Api\V1\Webhooks\PaymentWebhookController;
 use Illuminate\Support\Facades\Route;
 
 // TDD §7.1: base path /api/v1; breaking changes ship as /api/v2 with v1
@@ -26,7 +30,53 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         ->middleware('signed')
         ->name('kyc-documents.download');
 
+    // TDD §7.4/§8.3: HMAC/signature-verified inside the controller before
+    // any payload is trusted. Sanctum's stateful-API middleware (which
+    // would otherwise apply CSRF) only activates for requests whose
+    // origin matches a configured stateful domain — a webhook POST from
+    // Pesepay/Paynow's servers never does, so it reaches this route
+    // without a CSRF check, as a webhook must.
+    Route::post('/webhooks/{provider}', [PaymentWebhookController::class, 'handle'])
+        ->whereIn('provider', ['pesepay', 'paynow'])
+        ->name('webhooks.handle');
+
+    // TDD §5.9: guest checkout is fully supported — cart/checkout routes
+    // are deliberately outside auth:sanctum. $request->user() still
+    // resolves for a session-authenticated buyer; everyone else is
+    // identified by the PHP session ID (App\Services\CartService).
+    //
+    // Sanctum's statefulApi() middleware only starts a session when the
+    // request's Origin/Referer matches a configured stateful domain — it
+    // never does for a same-origin fetch() call that omits those headers
+    // (as most first-party AJAX does), which would leave $request->
+    // session() unbound. The 'guest-session' group starts a real session
+    // unconditionally instead. It deliberately excludes CSRF: these are
+    // JSON endpoints, not a form post, and a guest cart's worst-case
+    // cross-site risk (an attacker adding an item to someone else's
+    // anonymous cart) is far below what CSRF exists to prevent —
+    // upgrading to a CSRF-protected flow, or a header-based scheme
+    // instead of a cookie session, is a Run 1.7 dashboard-security
+    // follow-up if a stricter posture turns out to be warranted.
+    Route::middleware('guest-session')->group(function () {
+        Route::prefix('carts')->name('carts.')->group(function () {
+            Route::get('/', [CartController::class, 'show'])->name('show');
+            Route::post('/items', [CartController::class, 'storeItem'])->name('items.store');
+            Route::patch('/items/{item}', [CartController::class, 'updateItem'])->name('items.update');
+            Route::delete('/items/{item}', [CartController::class, 'destroyItem'])->name('items.destroy');
+        });
+
+        Route::prefix('checkout')->name('checkout.')->group(function () {
+            Route::post('/session', [CheckoutController::class, 'store'])->name('session.store');
+            Route::get('/session/{checkoutSession}', [CheckoutController::class, 'show'])->name('session.show');
+            Route::patch('/session/{checkoutSession}/address', [CheckoutController::class, 'setAddress'])->name('session.address');
+            Route::patch('/session/{checkoutSession}/delivery', [CheckoutController::class, 'setDelivery'])->name('session.delivery');
+            Route::post('/session/{checkoutSession}/payment', [CheckoutController::class, 'initiatePayment'])->name('session.payment');
+        });
+    });
+
     Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
+
         Route::post('/admin/users/{user}/roles', [RoleAssignmentController::class, 'store'])
             ->name('admin.users.roles.store');
 

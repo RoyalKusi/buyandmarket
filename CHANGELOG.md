@@ -3,6 +3,108 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Run 1.5 — Commerce core (backend)
+
+Scope: TDD §14, stage 1.5 — cart, checkout state machine, order splitting,
+and the `PaymentGateway` seam with two live implementations (Pesepay, the
+TDD's named provider, plus Paynow, added on request). This run covers the
+backend only; the storefront cart/checkout/confirmation UI is deferred
+(see "Deferred" below).
+
+### Added
+
+- **Schema**: `addresses`, `carts` (unique nullable `user_id`, indexed
+  nullable `session_id`), `cart_items`, `orders`, `order_groups`,
+  `order_items`, `checkout_sessions`, `payments` (unique
+  `(provider, provider_reference)` for webhook-redelivery idempotency),
+  `commissions`, `refunds`. `inventory_ledger.order_item_id` gets its
+  foreign key added via an expand-migrate-contract follow-up migration
+  (TDD §12.2), once `order_items` exists.
+- **Cart** (`App\Services\CartService`): guest (session-identified) and
+  authenticated carts, price-snapshot-at-add-time line items, quantity
+  update/remove, and `mergeIntoUserCart()` for TDD §3.4 module 17's
+  "merged on login" (quantities summed on collision).
+- **Checkout state machine** (`App\Services\CheckoutService`): TDD §5.9's
+  CartReview → AddressSelection → DeliveryMethod → PaymentProcessing →
+  OrderConfirmed (or → PaymentFailed, retryable without re-entering data).
+  Guest checkout is fully supported.
+- **Order splitting** (`App\Services\OrderService`): one `orders` row
+  (buyer receipt) plus one `order_groups` row per seller in the cart,
+  with `order_items.price_at_purchase` snapshot at order-creation time
+  (TDD §6.4 rule 1 — never a live join to product/variant price). Stock
+  is reserved (`InventoryService::adjustStock`) at order creation, before
+  payment confirms, and released if the order is cancelled unpaid.
+- **`App\Contracts\PaymentGateway`** (TDD §2.1 non-negotiable interface
+  seam) plus `App\Services\Payments\AbstractPaymentGateway`, which
+  implements the shared idempotency logic: `applyWebhookResult()` locks
+  the `Payment` row (`lockForUpdate()`), no-ops on an already-terminal
+  status (redelivered webhook safe), and calls
+  `OrderService::confirmPaidOrder()` on success.
+  - `PesepayGateway` — Pesepay's AES-256-CBC encrypted-payload pattern.
+  - `PaynowGateway` — Paynow's hash-signed form-POST pattern.
+  - `PaymentGatewayManager` — resolves either by provider name, since
+    both are live simultaneously (buyer picks one at checkout); see
+    `docs/adr/0005-payment-gateway-manager-for-simultaneous-providers.md`.
+- **`App\Services\CommissionService`**: records a `commissions` row per
+  `order_group` at order-creation time, using a single platform-wide
+  default rate (see "Deferred").
+- Idempotency-Key support (TDD §7.1) on the payment-initiation endpoint,
+  short-TTL cached per checkout session.
+- A new unconditional `guest-session` middleware group
+  (`EncryptCookies` + `AddQueuedCookiesToResponse` + `StartSession`,
+  deliberately without CSRF) for the guest-facing cart/checkout API
+  routes — Sanctum's `statefulApi()` only starts a session for requests
+  whose Origin/Referer matches a configured stateful domain, which a
+  same-origin `fetch()` without those headers (or a guest with no prior
+  session) doesn't reliably send.
+- Routes: public `POST /webhooks/{provider}` (signature-verified inside
+  the controller, deliberately outside `auth:sanctum`/CSRF, as a webhook
+  must be), guest-accessible `/carts/*` and `/checkout/session/*`, and
+  authenticated `GET /orders/{order}` (`OrderPolicy`: the buyer, or a
+  seller with an `order_group` on the order, may view it).
+- Feature tests (`tests/Feature/Commerce/CheckoutFlowTest.php`): full
+  checkout-to-paid-order flow against a faked Paynow response, webhook
+  idempotency (redelivery is a no-op), invalid webhook signature
+  rejection, empty-cart checkout rejection, and guest checkout.
+
+### Fixed
+
+- **bcmath unavailable in this environment** (`ext-bcmath` not installed,
+  and not installable here — the environment's package proxy rejects the
+  PPA). `OrderService` and `CommissionService` use plain float arithmetic
+  with `round(..., 2)` instead of `bcmul`/`bcadd`: all money here is
+  DECIMAL(12,2)-scale (TDD §6.4 rule 5), which is exact within float64
+  once scaled by 100, so this isn't a precision compromise — it's a
+  dependency this build doesn't take on since it isn't guaranteed present
+  on every PHP install.
+- Laravel's test HTTP client (`postJson`/`getJson`) omits cookies by
+  default, mirroring a cross-origin `fetch()` — a guest-checkout test
+  chaining two calls needs `withCredentials()` before the session cookie
+  a prior response set is sent back on the next simulated request.
+
+### Deferred / flagged
+
+- **Delivery fee** is a flat, buyer/seller-supplied value passed through
+  `checkout_sessions.delivery_selection` — there's no `delivery_rate_cards`
+  table yet (TDD stage 1.6); this run doesn't compute a fee from zones or
+  weight, it only carries whatever the delivery-method step submits.
+- **Commission rate** is a single platform-wide `config('commerce.
+  default_commission_rate')` default (10%), not a seller-tier rate —
+  seller tiers aren't built yet. The `rate_applied` column already exists
+  per `order_group` specifically so tiering can vary it later without a
+  schema change.
+- **Pesepay/Paynow field-level API shapes are unverified against a live
+  sandbox** — this environment has no network path to either provider.
+  Both adapters follow their publicly documented request/response
+  patterns (Pesepay's AES-256-CBC encrypted payload; Paynow's hash-signed
+  form fields) but should be confirmed against a real sandbox key before
+  the TDD §14 stage 1.9 staging cutover run.
+- **Refunds** have schema (`refunds` table) and a `PaymentGateway::refund()`
+  method on each gateway, but no service/UI calls them yet — refund
+  initiation is out of this run's scope.
+- **Storefront UI** (cart drawer, checkout page, order confirmation) is
+  not built in this run — see the Run 1.6 backlog.
+
 ## Run 1.4 — Storefront
 
 Scope: TDD §14, stage 1.4 — homepage, search, category, PDP, store pages
