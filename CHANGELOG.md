@@ -3,6 +3,90 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Run 1.2 — Catalogue core
+
+Scope: TDD §14, stage 1.2 — categories, brands, attributes, products,
+variants, inventory (§3.2).
+
+### Added
+
+- Minimal `sellers`/`stores` schema (only the columns TDD §6.2 lists for
+  them) as the foreign-key foundation the catalogue needs — the actual
+  onboarding/KYC/badge workflow is Run 1.3's own scope. Rationale in
+  `docs/adr/0003`.
+- Category tree (`categories`, self-referencing, `App\Services\
+  CategoryService` enforcing the §6.2 max-depth-3 rule at the application
+  layer) with category-scoped attribute templates (`category_attributes`).
+- Brands (`App\Services\BrandService`): seller-suggested, enter `pending`,
+  admin-approved/rejected before appearing in filters (TDD §3.2 module 11).
+- Products (`App\Services\ProductService`): `draft -> pending_review ->
+  published -> archived` lifecycle (module 7), soft-deleted (never hard-
+  deleted, §6.4 rule 3), `DECIMAL(12,2)` pricing, one leaf category per
+  product enforced at creation.
+- Product variants with attribute-value combinations
+  (`variant_attribute_values`), each carrying its own SKU/price
+  override/stock.
+- `inventory_ledger` (append-only) + `App\Services\InventoryService`:
+  every stock change writes a ledger row with a reason code;
+  `stock_quantity` on both variant and product is a materialised rollup,
+  never written directly (§6.4 rule 2). `inventory:reconcile` (Artisan
+  command, scheduled nightly) recomputes stock from the ledger — the
+  "checksum job" TDD names explicitly.
+- `price_history` (append-only) logging every price change with actor +
+  timestamp (module 13), written on both initial product creation and any
+  later price update, and audit-logged alongside.
+- Seller-ownership enforcement structural to the query layer, not just
+  Policy checks (TDD §6.4 rule 4/§8.5): `App\Models\Scopes\
+  SellerOwnershipScope`, applied for the duration of a request by
+  `App\Http\Middleware\ScopeQueriesToActingSeller` on every
+  `/api/v1/seller/*` route, reordered ahead of Laravel's route-model
+  binding so a guessed product ID belonging to another seller resolves
+  404, never 403 (confirms nothing about who owns it). Full rationale,
+  including the alternatives rejected, in `docs/adr/0002`.
+- `ProductPolicy`, `CategoryPolicy`, `BrandPolicy` with full
+  authorization-matrix test coverage per TDD §11 (admin/seller/buyer/guest
+  × every new Policy-protected route).
+- `/api/v1` routes: public category listing + product detail (view-scoped
+  to published or owner), admin category/brand/product-moderation
+  endpoints, seller brand-suggestion/product-CRUD/lifecycle endpoints.
+
+### Verified against acceptance criteria (TDD §16 / Run 1.2 exit criteria)
+
+- "Admin can create a full category tree": `CategoryTest` builds a full
+  4-level tree (depths 0-3) and confirms a 5th level (depth 4) is
+  rejected.
+- "A seller can create a product with variants": `ProductCreationTest`
+  covers an active seller creating a multi-variant product end-to-end,
+  including the initial price-history and inventory-ledger rows it
+  produces; an inactive seller and a non-seller are both denied.
+- 35 tests / 87 assertions passing (14 new since Run 1.1); Pint clean;
+  migrations run clean fresh and reversible (`migrate:fresh`).
+
+### Deferred / flagged for a later run
+
+- No admin API for directly creating `attributes`/`attribute_values` yet
+  — they're modelled and consumed (variants attach to them), but only
+  seedable, not yet manageable through an endpoint. Not required by this
+  run's exit criteria; will be added alongside whichever run first needs
+  sellers to define category-specific attribute sets through the UI.
+- No product images. TDD's module 7 name ("Product creation/upload")
+  reads as if image upload belongs here, but the full image-intelligence
+  pipeline (validation, quality scoring, background processing,
+  compression/variants, alt-text) is explicitly Run 1.9's scope — adding
+  a bare, un-pipelined image field now would mean either reworking it in
+  1.9 or shipping catalogue images that never got a quality/authenticity
+  pass. Deferred whole, not half-built.
+- No `SearchProvider` interface yet, despite `products.description`
+  already having a MySQL-only `FULLTEXT` index. TDD's own module map
+  places search (module 39) under Storefront (Run 1.4), which is also
+  where a consumer for the interface first exists; building the
+  abstraction with nothing calling it yet would be the "interface with no
+  second implementation and no first caller" anti-pattern. The index
+  itself is schema, not architecture, and costs nothing to have early.
+- Larastan/PHPStan still could not be installed in this sandbox (same
+  GitHub dist-download network limitation noted in Run 1.1); unaffected
+  packages continue to install and run normally.
+
 ## Run 1.1 — Foundations
 
 Scope: TDD §14, stage 1.1 — Laravel scaffold, auth/RBAC (§8.1), Design
