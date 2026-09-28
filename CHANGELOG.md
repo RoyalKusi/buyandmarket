@@ -3,6 +3,114 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Run 1.8 — AI platform v1
+
+Scope: TDD §14, stage 1.8 — RAG ingestion/retrieval, the buyer-facing
+assistant (search, product Q&A, order tracking), tool-calling with the
+confirm-before-execute boundary (§5.4). Exit criterion: "Assistant
+answers grounded product/order questions with citations in staging."
+
+### Added
+
+- **Schema**: `rag_documents` (one row per source entity, keyed by a
+  content hash so unchanged content skips re-embedding), `embeddings`
+  (chunk vector + metadata, JSON — see docs/adr/0006 for why not a
+  native vector type/index), `conversations` and `conversation_messages`
+  (guest-session-identified the same way carts/checkout are; an
+  assistant message can propose a state-changing tool call without
+  executing it via `requires_confirmation`/`confirmed`).
+- **`App\Contracts\Ai\LlmProvider`/`EmbeddingProvider`** (TDD §8.4:
+  "provider-agnostic at the integration boundary"), with one concrete
+  OpenAI-compatible implementation of each. Same "unverified against a
+  live API" caveat as Pesepay/Paynow (Run 1.5) — this sandbox has no
+  network path to a real LLM/embeddings provider; every test fakes the
+  HTTP calls.
+- **`App\Services\Ai\IngestionService`**: chunks and embeds Products
+  (title + description + price, one chunk per product — variants
+  summarised, not exploded per-variant, per TDD §5.1) and Stores. CMS/
+  policy-FAQ and Promotion chunking are deferred — those modules (44,
+  14) don't exist yet to source content from.
+- **`App\Services\Ai\RetrievalService`**: metadata-filtered (TDD §5.2)
+  then similarity-ranked candidate search, with live product/seller
+  status re-checked at query time rather than trusted from
+  (potentially stale) embedded metadata — see docs/adr/0006.
+- **`App\Services\Ai\ToolExecutor`**: read tools (`search_products`,
+  `get_product_details`, `check_stock`, `get_order_status`,
+  `get_delivery_estimate`) execute directly; `get_order_status` is
+  parameterized by an order id but always scoped server-side to the
+  authenticated user, never trusting a user id the model might supply
+  (TDD §5.4's own named impersonation vector). `add_to_cart` is
+  state-changing and is the one tool `AssistantService` never lets
+  `ToolExecutor` run except via the confirm step below.
+- **`App\Services\Ai\AssistantService`**: orchestrates retrieval →
+  grounded system prompt (retrieved content passed as clearly delimited,
+  labelled data, never concatenated into the instruction context — TDD
+  §8.4) → tool-calling loop (capped at 4 rounds) → final grounded
+  response. A state-changing tool call halts the loop and returns a
+  pending-confirmation message instead of executing; a separate
+  `confirmAction()` (reached only via the confirm endpoint) is the one
+  path that actually runs it. Every tool call is audit-logged (TDD
+  §5.7) with the conversation, tool name, arguments and result.
+- **Citations are structural, not model-trusted**: every tool result and
+  every retrieved chunk used to ground a turn carries its own
+  `{type, id}` citation, attached to the final assistant message
+  regardless of what the model's own prose does or doesn't cite —
+  satisfies TDD §5.3 rule 3 without depending on the LLM reliably
+  self-citing.
+- Routes (guest-session, same group as cart/checkout): `POST /api/v1/ai/
+  conversations`, `POST .../messages`, `POST .../messages/{message}/
+  confirm`.
+- **`php artisan ai:reindex`**: the nightly/full-reindex half of TDD
+  §5.1's ingestion triggers (see "Deferred" for the other half).
+- A minimal functional chat UI (`App\Livewire\AiAssistant`, `/dashboard/
+  assistant`): message bubbles, citations, and an explicit Confirm/
+  Cancel action card for a pending state-changing tool call (TDD §5.4's
+  hard rule, Design System §7.3) — a scoped-down v1 of the dark-panel
+  conversation surface (see "Deferred").
+- Feature tests (`tests/Feature/Ai/AssistantTest.php`): a grounded
+  product-price question answered with a citation, a read-tool
+  (`check_stock`) call grounding the answer and writing an audit-log
+  row, a state-changing tool (`add_to_cart`) halting for confirmation
+  and only mutating the cart/writing its audit-log row after the
+  confirm call, `get_order_status` returning "not found" for another
+  buyer's order id rather than trusting the model-supplied id, and
+  conversation ownership (404 on another user's conversation).
+
+### Deferred / flagged
+
+- **No event-triggered incremental re-embedding.** TDD §5.1 asks for
+  re-embedding on product create/update/price-change/stock-change via a
+  queued job; wiring that into every `Product` save would make routine
+  product saves synchronously dependent on an external embeddings API
+  with no queue worker guaranteed running on this launch topology (§2.1)
+  — worse than a batch. `php artisan ai:reindex` (run nightly, per
+  §5.1's other stated trigger) is this run's whole ingestion story.
+  Content changed since the last run won't be reflected until the next
+  one.
+- **No reranking pass** (TDD §5.2's cross-encoder step) — see docs/
+  adr/0006. Cosine similarity over the metadata-filtered set is the
+  whole ranking step this run.
+- **No CMS/policy-FAQ or Promotions ingestion** — modules 44 and 14
+  don't exist yet to source content from; the assistant can answer
+  product/store/order questions, not policy questions.
+- **No hallucination eval harness** (TDD §11's golden-question regression
+  set) — this sandbox has no real LLM to score against. The structural
+  controls (grounded system prompt, server-side citation attachment,
+  confirm-before-execute) are implemented and tested; whether a real
+  model's prose actually stays within them is unverified, same caveat as
+  the payment gateways.
+- **No streaming, quick-action chips, or grounded product/store/order
+  cards rendered as their own components** (Design System §7.3/§7.4) —
+  the chat UI is plain message bubbles with a citation line and one
+  action-card pattern, not the full dark-panel treatment.
+- **No proactive notifications, seller/admin AI surfaces, or image
+  intelligence pipeline** (TDD §5.6/§5.8) — this run is the buyer-facing
+  assistant only, per the TDD's own stage split (seller/admin AI tools
+  are stage 1.11).
+- **Conversation retention/anonymisation window** (TDD §8.8) is not
+  implemented as a scheduled job — transcripts persist indefinitely for
+  now.
+
 ## Run 1.7 — Dashboards
 
 Scope: TDD §14, stage 1.7 — buyer/seller/shipper/admin dashboards (§3.6

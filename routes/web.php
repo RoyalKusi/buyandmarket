@@ -34,6 +34,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard/addresses', [BuyerController::class, 'addresses'])->name('dashboard.addresses');
     Route::post('/dashboard/addresses', [BuyerController::class, 'storeAddress'])->name('dashboard.addresses.store');
     Route::delete('/dashboard/addresses/{address}', [BuyerController::class, 'destroyAddress'])->name('dashboard.addresses.destroy');
+    Route::view('/dashboard/assistant', 'dashboard.assistant')->name('dashboard.assistant');
 
     // TDD §6.4 rule 4: seller.scope keeps every query here confined to
     // the acting seller's own rows, same guarantee as the API.

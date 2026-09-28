@@ -96,6 +96,14 @@ class User extends Authenticatable
         return $this->hasMany(Address::class);
     }
 
+    /**
+     * @return HasMany<Conversation, $this>
+     */
+    public function conversations(): HasMany
+    {
+        return $this->hasMany(Conversation::class);
+    }
+
     protected static function booted(): void
     {
         // TDD §6.2: "phone or email required, not both nullable."

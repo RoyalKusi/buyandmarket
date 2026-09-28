@@ -54,4 +54,16 @@ return [
         'return_url' => env('PAYNOW_RETURN_URL'),
     ],
 
+    // TDD §5/§8.4: the AI platform layer's provider boundary
+    // (App\Contracts\Ai\LlmProvider / EmbeddingProvider). Provider-
+    // agnostic by design — swapping vendors is a config change, not a
+    // call-site change.
+    'ai' => [
+        'api_key' => env('AI_API_KEY'),
+        'chat_url' => env('AI_CHAT_URL', 'https://api.openai.com/v1/chat/completions'),
+        'chat_model' => env('AI_CHAT_MODEL', 'gpt-4o-mini'),
+        'embeddings_url' => env('AI_EMBEDDINGS_URL', 'https://api.openai.com/v1/embeddings'),
+        'embedding_model' => env('AI_EMBEDDING_MODEL', 'text-embedding-3-small'),
+    ],
+
 ];

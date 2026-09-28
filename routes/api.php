@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\Admin\BrandModerationController;
 use App\Http\Controllers\Api\V1\Admin\KycReviewController;
 use App\Http\Controllers\Api\V1\Admin\ProductModerationController;
 use App\Http\Controllers\Api\V1\Admin\RoleAssignmentController;
+use App\Http\Controllers\Api\V1\Ai\ConversationController;
 use App\Http\Controllers\Api\V1\CartController;
 use App\Http\Controllers\Api\V1\CategoryController;
 use App\Http\Controllers\Api\V1\CheckoutController;
@@ -75,6 +76,15 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::patch('/session/{checkoutSession}/address', [CheckoutController::class, 'setAddress'])->name('session.address');
             Route::patch('/session/{checkoutSession}/delivery', [CheckoutController::class, 'setDelivery'])->name('session.delivery');
             Route::post('/session/{checkoutSession}/payment', [CheckoutController::class, 'initiatePayment'])->name('session.payment');
+        });
+
+        // TDD §5.9/§7.3: the assistant is available to guests too (same
+        // session-identified pattern as the guest cart above), not
+        // gated behind auth:sanctum.
+        Route::prefix('ai/conversations')->name('ai.conversations.')->group(function () {
+            Route::post('/', [ConversationController::class, 'store'])->name('store');
+            Route::post('/{conversation}/messages', [ConversationController::class, 'storeMessage'])->name('messages.store');
+            Route::post('/{conversation}/messages/{message}/confirm', [ConversationController::class, 'confirm'])->name('messages.confirm');
         });
     });
 

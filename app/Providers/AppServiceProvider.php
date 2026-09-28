@@ -2,8 +2,12 @@
 
 namespace App\Providers;
 
+use App\Contracts\Ai\EmbeddingProvider;
+use App\Contracts\Ai\LlmProvider;
 use App\Contracts\SearchProvider;
 use App\Models\User;
+use App\Services\Ai\OpenAiCompatibleEmbeddingProvider;
+use App\Services\Ai\OpenAiCompatibleLlmProvider;
 use App\Services\Search\EloquentSearchProvider;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -19,6 +23,11 @@ class AppServiceProvider extends ServiceProvider
         // TDD §2.1/§13 stage 4: the only place that ever changes when the
         // platform moves off MySQL full-text onto Meilisearch/Typesense.
         $this->app->bind(SearchProvider::class, EloquentSearchProvider::class);
+
+        // TDD §5/§8.4: single-implementation-today, swappable-tomorrow
+        // boundary — see docs/adr/0006.
+        $this->app->bind(LlmProvider::class, OpenAiCompatibleLlmProvider::class);
+        $this->app->bind(EmbeddingProvider::class, OpenAiCompatibleEmbeddingProvider::class);
     }
 
     /**
