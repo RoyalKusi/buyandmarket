@@ -20,6 +20,7 @@ class ProductService
     public function __construct(
         private readonly InventoryService $inventoryService,
         private readonly AuditLogger $auditLogger,
+        private readonly SellerOnboardingService $sellerOnboardingService,
     ) {}
 
     /**
@@ -28,9 +29,9 @@ class ProductService
      */
     public function create(Seller $seller, array $data, array $variants): Product
     {
-        if (! $seller->isActive()) {
+        if (! $seller->isInGoodStanding()) {
             throw ValidationException::withMessages([
-                'seller' => 'Only active sellers may list products.',
+                'seller' => 'Suspended or terminated sellers may not create products.',
             ]);
         }
 
@@ -95,6 +96,10 @@ class ProductService
                 }
             }
 
+            // TDD §3.1 module 4: the onboarding stepper's "first product"
+            // step. Idempotent — a no-op once already complete.
+            $this->sellerOnboardingService->markFirstProductStepComplete($seller);
+
             return $product->fresh(['variants']);
         });
     }
@@ -110,6 +115,15 @@ class ProductService
     public function approve(Product $product, User $admin): Product
     {
         $this->assertStatus($product, 'pending_review');
+
+        // TDD §3.1 module 2: "only active sellers can list products" —
+        // this is where that rule actually bites (see ProductPolicy::
+        // create() for why it isn't enforced at draft-creation time).
+        if (! $product->store->seller->isActive()) {
+            throw ValidationException::withMessages([
+                'seller' => 'Only an active seller\'s products may be published.',
+            ]);
+        }
 
         return DB::transaction(function () use ($product, $admin) {
             $before = $product->only(['status']);

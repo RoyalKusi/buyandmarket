@@ -59,6 +59,19 @@ class ProductLifecycleTest extends TestCase
         ]);
     }
 
+    public function test_a_product_cannot_be_published_unless_its_seller_is_active(): void
+    {
+        $admin = User::factory()->withRole('admin')->create();
+        $seller = Seller::factory()->withStore()->create(['status' => 'under_review']);
+        $product = Product::factory()->for($seller->store)->create(['status' => 'pending_review']);
+
+        $this->actingAs($admin)
+            ->postJson("/api/v1/admin/products/{$product->id}/approve")
+            ->assertUnprocessable();
+
+        $this->assertSame('pending_review', $product->fresh()->status);
+    }
+
     public function test_the_seller_cannot_approve_their_own_product(): void
     {
         $seller = Seller::factory()->active()->create();

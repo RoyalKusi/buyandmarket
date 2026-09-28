@@ -20,7 +20,14 @@ class ProductPolicy
 
     public function create(User $user): bool
     {
-        return $user->hasRole('seller') && $user->seller?->isActive();
+        // TDD §3.1 module 4: the onboarding stepper's "first product" step
+        // happens before a seller reaches 'active' status — so creating a
+        // draft product only requires being a seller in good standing, not
+        // an active one. "Only active sellers can list products" (§3.1
+        // module 2) is enforced instead where it actually applies: the
+        // pending_review -> published transition (see ProductService::
+        // approve() and this policy's approve()).
+        return $user->hasRole('seller') && $user->seller?->isInGoodStanding();
     }
 
     public function update(User $user, Product $product): bool

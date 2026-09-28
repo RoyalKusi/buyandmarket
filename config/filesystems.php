@@ -47,6 +47,18 @@ return [
             'report' => false,
         ],
 
+        // TDD §8.3: KYC documents are stored outside the public webroot,
+        // never served by a direct/guessable URL — access is only ever
+        // through a signed, time-limited URL (App\Http\Controllers\Api\V1\
+        // KycDocumentController).
+        'kyc' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/kyc'),
+            'serve' => false,
+            'throw' => false,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

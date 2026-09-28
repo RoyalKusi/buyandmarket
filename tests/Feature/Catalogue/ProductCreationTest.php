@@ -57,9 +57,30 @@ class ProductCreationTest extends TestCase
         $this->assertSame(15, $product->fresh()->stock_quantity);
     }
 
-    public function test_a_non_active_seller_cannot_create_a_product(): void
+    /**
+     * TDD §3.1 module 4: the onboarding stepper's "first product" step
+     * happens before a seller is 'active' — so a seller still mid-
+     * onboarding must be able to create a draft product.
+     */
+    public function test_a_seller_still_in_onboarding_can_create_a_draft_product(): void
     {
-        $seller = Seller::factory()->create(['status' => 'pending']);
+        $seller = Seller::factory()->withStore()->create(['status' => 'under_review']);
+        $category = Category::factory()->create();
+
+        $this->actingAs($seller->user)
+            ->postJson('/api/v1/seller/products', [
+                'category_id' => $category->id,
+                'title' => 'Bluetooth Speaker',
+                'base_price' => '29.99',
+                'variants' => [$this->variantPayload()],
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.status', 'draft');
+    }
+
+    public function test_a_suspended_seller_cannot_create_a_product(): void
+    {
+        $seller = Seller::factory()->withStore()->create(['status' => 'suspended']);
         $category = Category::factory()->create();
 
         $this->actingAs($seller->user)

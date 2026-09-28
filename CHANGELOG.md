@@ -3,6 +3,106 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Run 1.3 — Seller onboarding
+
+Scope: TDD §14, stage 1.3 — registration, KYC, store creation (§3.1
+modules 1-6).
+
+### Added
+
+- `App\Services\SellerOnboardingService`: the full stepper (business info
+  -> KYC documents -> bank/payout details -> store setup -> first product
+  -> admin review), each step's completion independently timestamped and
+  resumable (`seller_onboarding_steps`). Registration is self-service —
+  any authenticated user may become a seller of their own account —
+  and always assigns the `buyer`-parallel `seller` role the same way Run
+  1.1's registration assigns `buyer`.
+- `kyc_documents`/`kyc_reviews`: national ID + proof of address required,
+  business registration optional; stored via a dedicated, private
+  `Storage::disk('kyc')` (outside the public webroot, TDD §8.3) with
+  server-side MIME validation. Every review decision (one row per
+  decision, so a rejection-then-resubmission keeps full history) is
+  audit-logged.
+- Signed, time-limited KYC document downloads
+  (`App\Http\Controllers\Api\V1\KycDocumentController`): a Policy-gated
+  endpoint mints a 15-minute `temporarySignedRoute`; the actual download
+  route carries no other authorization; the signature is the credential
+  (TDD §8.3).
+- `App\Services\KycReviewService`: approval carries a seller straight from
+  `under_review` to `active` in one action (by the time admin review
+  happens, every earlier stepper step — including store setup and the
+  first product — is already complete, TDD §3.1 module 4); rejection
+  requires a reason code, reopens the KYC-documents step, and returns the
+  seller to `pending` for resubmission (mirrors Run 1.2's product-rejection
+  UX).
+- `seller_payout_details`: the stepper's bank/payout step; account number
+  encrypted at rest.
+- `App\Services\SellerBadgeService` + nightly `sellers:recompute-badges`:
+  computes the two badges the current schema can honestly support —
+  Verified (KYC approved) and New (<90 days) — as a row's presence, added
+  or removed idempotently on each run (TDD §3.1 module 6). Top Rated and
+  Fast Responder are deferred (see below).
+- `SellerPolicy` with full authorization-matrix coverage: self-service
+  registration (once), owner-only onboarding actions, admin-only KYC
+  review.
+
+### Corrected
+
+- Run 1.2 gated product **creation** on `seller.status === 'active'`. TDD
+  §3.1 module 4's stepper needs a seller to create their "first product"
+  *before* reaching `active` (admin review, which grants `active`, is the
+  stepper's last step) — so that gate made onboarding impossible to
+  complete. Fixed: creation now requires only that the seller isn't
+  `suspended`/`terminated`; "only active sellers can list products" is
+  enforced instead at the `pending_review -> published` transition, which
+  is what "list" (publish) actually means. Full rationale in
+  `docs/adr/0004`; Run 1.2's tests were updated to match.
+
+### Verified against acceptance criteria (TDD §16 / Run 1.3 exit criteria)
+
+- "A seller can go from registration to `active` status end-to-end":
+  `OnboardingTest::test_the_full_onboarding_flow_takes_a_seller_from_registration_to_active`
+  drives every stepper step through its real HTTP endpoint, in order,
+  finishing on an admin KYC approval that flips the seller to `active`.
+- KYC rejection's "fix and resubmit" path (§4.2) is covered end-to-end:
+  reason code required, documents step reopens, seller returns to
+  `pending`.
+- Full authorization-matrix coverage for every new Policy-protected
+  route (self-registration-once, owner-only onboarding actions, admin-only
+  review/approval).
+- 52 tests / 130 assertions passing (17 new since Run 1.2); Pint clean;
+  migrations run clean fresh and reversible.
+- Running the full end-to-end flow test caught two real bugs before they
+  shipped: `URL::temporarySignedRoute()` was generating a signed URL
+  against an unprefixed route name (the actual name carries the `api.v1.`
+  group prefix), and `Seller::factory()` didn't create the
+  `seller_onboarding_steps` rows the real `register()` flow does — which
+  let the "submit for review before all steps are complete" guard pass
+  vacuously in tests. Both fixed; the factory now mirrors registration's
+  side effects exactly, so factory-built sellers behave like real ones in
+  every other test that touches onboarding state.
+
+### Deferred / flagged for a later run
+
+- No virus scanning on KYC document uploads. TDD §8.3 names this
+  explicitly ("virus scan on KYC document uploads"); it requires an
+  external scanning service (e.g. ClamAV) this run has no integration
+  point for. Server-side MIME sniffing and re-encoding are not a
+  substitute and aren't claimed to be — this is a real gap, not a
+  silently-downgraded requirement.
+- Top Rated and Fast Responder badges are not computed — they depend on
+  the reviews module and buyer-seller messaging, neither built yet.
+  `SellerBadgeService` is structured so adding them later is additive,
+  not a rewrite.
+- No admin worklist/queue UI for pending seller reviews (TDD §4.4 calls
+  for "purpose-built queues ... surfaced as prioritised worklists") —
+  that's dashboard UI, Run 1.7's scope. This run's admin actions are
+  full-featured API endpoints; only the queue's presentation is deferred.
+- `buyer_profiles` (TDD §3.1 module 1's second entity, alongside `users`)
+  is still unbuilt. Nothing in Runs 1.1-1.3 needed it yet; it'll ship
+  alongside whichever run first needs buyer-specific profile data
+  (addresses, preferences) — likely Commerce core (Run 1.5).
+
 ## Run 1.2 — Catalogue core
 
 Scope: TDD §14, stage 1.2 — categories, brands, attributes, products,
