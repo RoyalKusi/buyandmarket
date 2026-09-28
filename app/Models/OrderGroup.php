@@ -69,6 +69,14 @@ class OrderGroup extends Model
         return $this->hasOne(Commission::class);
     }
 
+    /**
+     * @return HasOne<OrderGroupShipment, $this>
+     */
+    public function shipment(): HasOne
+    {
+        return $this->hasOne(OrderGroupShipment::class);
+    }
+
     public function scopeOwnedBySeller(Builder $query, Seller $seller): void
     {
         $query->where('seller_id', $seller->id);

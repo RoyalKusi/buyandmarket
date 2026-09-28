@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\DeliveryRateCard;
+use App\Models\OrderGroup;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use Closure;
@@ -29,6 +31,8 @@ class ScopeQueriesToActingSeller
 
         Product::scopeToSeller($seller);
         ProductVariant::scopeToSeller($seller);
+        OrderGroup::scopeToSeller($seller);
+        DeliveryRateCard::scopeToSeller($seller);
 
         return $next($request);
     }

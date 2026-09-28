@@ -3,6 +3,89 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Run 1.6 — Fulfilment
+
+Scope: TDD §14, stage 1.6 — shipping, the shipper role, order tracking,
+delivery zones and delivery pricing (§3.4 modules 22-26). Exit criterion:
+"An order can be assigned, tracked through delivery, and marked
+delivered."
+
+### Added
+
+- **Schema**: `delivery_zones` (self-referencing province → city → area
+  hierarchy), `shippers` (mirrors `sellers`' shape — one shipper profile
+  per user), `delivery_rate_cards` (seller × zone × method, with a
+  free-delivery threshold override per TDD §3.4 module 26), `order_group_
+  shipments` (one per `order_group`, `shipper_id` nullable for the pooled/
+  platform-dispatched path), `shipment_events` (append-only, no update/
+  delete grants — matches `inventory_ledger`/`audit_logs`).
+- **`App\Services\ShippingService`**: looks up a seller's rate card for a
+  zone/method (rejects an unconfigured combination rather than silently
+  defaulting a fee); `assign()` creates a shipment either seller-selected
+  (an explicit `shipper_id`) or platform-dispatched (left unassigned, open
+  to `claim()` by any active shipper — TDD §3.4 module 23's "both paths
+  converge on the same `order_group_shipments` record"); `recordEvent()`
+  appends an immutable `shipment_events` row, updates the shipment's own
+  status, and syncs `order_group.status` (`shipped` once physically
+  moving, `completed` on delivery — there's no separate buyer-confirmation
+  window in this run, see "Deferred" below) with an audit log entry.
+- **Proof of delivery** (Design System §6.11): the `delivered` event
+  requires a photo and a signature capture, stored on a new private
+  `shipments` disk (`config/filesystems.php`), following the same
+  never-publicly-guessable pattern Run 1.3 established for KYC documents.
+- Seller endpoints: `GET`/`POST /seller/delivery-rate-cards` (a seller
+  "opts into" a zone by having a rate card for it, per TDD §3.4 module 25
+  — there's no separate opt-in list) and `POST /seller/order-groups/
+  {orderGroup}/shipment` to assign a shipment, both behind `seller.scope`
+  (`OrderGroup` and `DeliveryRateCard` now join `Product`/`ProductVariant`
+  in `ScopeQueriesToActingSeller`, so a seller's token still can't reach
+  another seller's order group — 404, not 403, per TDD §8.5).
+- Shipper endpoints: self-service `POST /shipper/register` (mirrors seller
+  registration's pattern), `GET /shipper/shipments` (my active
+  assignments), `POST /shipper/shipments/{shipment}/claim` (pooled
+  shipments), `POST /shipper/shipments/{shipment}/events` (log
+  pickup/transit/delivered — matches the TDD §7.3 endpoint table exactly).
+  `OrderGroupShipmentPolicy` keeps event-logging assignment-scoped: a
+  shipper can only act on a shipment claimed/assigned to them.
+- `GET /orders/{order}` (buyer/seller) now eager-loads each order group's
+  shipment and its event timeline, so the tracking view specified in
+  Design System §6.4/§6.11 has a single request to read from.
+- `database/seeders/DeliveryZoneSeeder.php`: Zimbabwe's 10 provinces with
+  a representative set of major cities/areas (see "Deferred").
+- Feature tests (`tests/Feature/Fulfilment/ShipmentTrackingTest.php`):
+  seller assigns a shipment against a matching rate card (and is rejected
+  without one), seller-isolation on assignment (404 on another seller's
+  order group), a shipper logging events through to delivery with the
+  order group transitioning `confirmed → processing → shipped →
+  completed`, assignment-scoped authorization denial, pooled-shipment
+  claiming, and the buyer-facing tracking read.
+
+### Deferred / flagged
+
+- **`order_group` goes straight to `completed` on delivery.** The TDD's
+  own lifecycle table lists `delivered` as a distinct state before
+  `completed`; this run treats them as the same transition since there's
+  no return-window/buyer-confirmation module built yet to occupy the gap
+  between them. Revisit once a returns/dispute flow (module 33 adjacent)
+  needs that distinction.
+- **Delivery zone dataset is a representative starter set**, not the full
+  Zimbabwean gazetteer (province → every ward). TDD §14 stage 1.9
+  (migration execution) is the right place for the complete dataset —
+  it's a data-entry task, not an engineering one, and shouldn't block
+  this run's exit criterion.
+- **Shipper onboarding has no KYC/verification step**, unlike sellers
+  (§3.1 modules 4-5) — registration is immediate self-service and the
+  shipper is active right away. A verification step is flagged as a
+  Run 1.7 (dashboards) follow-up alongside the shipper dashboard itself.
+- **No distance/weight-banded pricing** — `delivery_rate_cards` is flat
+  fee only for this run, per the TDD's own module 26 note that
+  weight/distance banding is a refinement, not required for this run's
+  exit criterion.
+- **No shipper dashboard UI** — the endpoints above are API-only; the
+  card-list shipper dashboard (Design System §6.11: pickup/dropoff map
+  pins, one-tap navigate, proof-of-delivery capture UI) is storefront/
+  dashboard work for Run 1.7, same as the buyer/seller/admin dashboards.
+
 ## Run 1.5 — Commerce core (backend)
 
 Scope: TDD §14, stage 1.5 — cart, checkout state machine, order splitting,

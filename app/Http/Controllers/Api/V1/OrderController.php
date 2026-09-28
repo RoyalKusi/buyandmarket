@@ -12,6 +12,10 @@ class OrderController extends Controller
     {
         $this->authorize('view', $order);
 
-        return response()->json(['data' => $order->load('orderGroups.items.variant.product', 'payments')]);
+        return response()->json(['data' => $order->load(
+            'orderGroups.items.variant.product',
+            'orderGroups.shipment.events',
+            'payments',
+        )]);
     }
 }

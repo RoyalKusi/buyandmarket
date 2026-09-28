@@ -72,6 +72,14 @@ class User extends Authenticatable
         return $this->hasOne(Seller::class);
     }
 
+    /**
+     * @return HasOne<Shipper, $this>
+     */
+    public function shipper(): HasOne
+    {
+        return $this->hasOne(Shipper::class);
+    }
+
     protected static function booted(): void
     {
         // TDD §6.2: "phone or email required, not both nullable."

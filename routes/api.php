@@ -11,8 +11,12 @@ use App\Http\Controllers\Api\V1\KycDocumentController;
 use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\Seller\BrandController as SellerBrandController;
+use App\Http\Controllers\Api\V1\Seller\DeliveryRateCardController;
 use App\Http\Controllers\Api\V1\Seller\OnboardingController as SellerOnboardingController;
 use App\Http\Controllers\Api\V1\Seller\ProductController as SellerProductController;
+use App\Http\Controllers\Api\V1\Seller\ShipmentController as SellerShipmentController;
+use App\Http\Controllers\Api\V1\Shipper\OnboardingController as ShipperOnboardingController;
+use App\Http\Controllers\Api\V1\Shipper\ShipmentController as ShipperShipmentController;
 use App\Http\Controllers\Api\V1\Webhooks\PaymentWebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -115,7 +119,28 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
                 Route::post('/products/{product}/submit', [SellerProductController::class, 'submitForReview'])->name('products.submit');
                 Route::post('/products/{product}/archive', [SellerProductController::class, 'archive'])->name('products.archive');
                 Route::patch('/products/{product}/price', [SellerProductController::class, 'updatePrice'])->name('products.price');
+
+                // TDD §3.4 modules 22/26: rate cards double as "which
+                // zones/methods this seller serves" (no separate opt-in
+                // list), and shipment assignment on the seller's own
+                // order_groups (OrderGroup::scopeToSeller keeps this
+                // 404, not 403, on another seller's order_group, per
+                // §8.5).
+                Route::get('/delivery-rate-cards', [DeliveryRateCardController::class, 'index'])->name('delivery-rate-cards.index');
+                Route::post('/delivery-rate-cards', [DeliveryRateCardController::class, 'store'])->name('delivery-rate-cards.store');
+                Route::post('/order-groups/{orderGroup}/shipment', [SellerShipmentController::class, 'store'])->name('order-groups.shipment.store');
             });
+        });
+
+        Route::prefix('shipper')->name('shipper.')->group(function () {
+            // TDD §3.4 module 23: registration is self-service, matching
+            // the seller onboarding pattern; every other action
+            // authorizes per-shipment via ShipperPolicy/
+            // OrderGroupShipmentPolicy.
+            Route::post('/register', [ShipperOnboardingController::class, 'register'])->name('register');
+            Route::get('/shipments', [ShipperShipmentController::class, 'index'])->name('shipments.index');
+            Route::post('/shipments/{shipment}/claim', [ShipperShipmentController::class, 'claim'])->name('shipments.claim');
+            Route::post('/shipments/{shipment}/events', [ShipperShipmentController::class, 'storeEvent'])->name('shipments.events.store');
         });
     });
 });
