@@ -28,6 +28,15 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Design System §6.7: single-screen, tab-switchable sign-in/
+        // create-account — implemented here as two thin views sharing one
+        // guest layout, since the register.store/login.store POST
+        // handlers (Fortify's own controllers) already worked and were
+        // tested (tests/Feature/Auth/RegistrationTest.php) before these
+        // GET views existed to reach them from a browser.
+        Fortify::loginView('auth.login');
+        Fortify::registerView('auth.register');
+
         Fortify::createUsersUsing(CreateNewUser::class);
         Fortify::updateUserProfileInformationUsing(UpdateUserProfileInformation::class);
         Fortify::updateUserPasswordsUsing(UpdateUserPassword::class);

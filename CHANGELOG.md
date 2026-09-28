@@ -3,6 +3,102 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Run 1.7 — Dashboards
+
+Scope: TDD §14, stage 1.7 — buyer/seller/shipper/admin dashboards (§3.6
+modules 27-30). Exit criterion: "Each role has a functional operational
+home base."
+
+### Added
+
+- **Web authentication, wired for the first time.** Laravel Fortify was
+  registered in Run 1.1 (`'views' => true`, registration/password-reset/
+  2FA features enabled) but never given the view names its own routes
+  expect — `GET /login` and `GET /register` would have 500'd on a missing
+  view binding. `App\Providers\FortifyServiceProvider::boot()` now calls
+  `Fortify::loginView()`/`registerView()`, backed by two new views
+  (`resources/views/auth/`) sharing a minimal `x-layouts.guest` shell.
+  The `register.store`/`login.store` POST handlers themselves already
+  worked and were already tested
+  (`tests/Feature/Auth/RegistrationTest.php`) — only the page a browser
+  needs to reach them was missing. `config('fortify.home')` now points to
+  `/dashboard` instead of the stub `/home`.
+- **One shared dashboard shell** (`x-layouts.dashboard`, Design System
+  §6.11): sidebar nav + top bar, so a user holding buyer + seller +
+  shipper + admin roles simultaneously (TDD §3.1 module 1's own example)
+  sees one product, not several bolted together. The seller-mode
+  sidebar-inverts-to-blue-900 treatment and the collapsible icon rail are
+  deferred (see below) — this is a functional, not yet pixel-complete,
+  shell.
+- **`App\Http\Middleware\EnsureUserHasRole`** (`role:admin`): a thin
+  route-group gate for the admin dashboard shell. Individual privileged
+  actions inside it (KYC/product moderation) still go through their own
+  Policy via the existing `Gate::before` admin bypass — this middleware
+  only keeps a non-admin from loading the shell at all.
+- **Buyer dashboard**: order list + per-order detail (reusing `OrderPolicy`
+  and the same eager-loaded shipment-tracking timeline Run 1.6 added to
+  the API), and address management (add/remove, set default).
+- **Seller dashboard** (behind `seller.scope`, same isolation guarantee as
+  the API — TDD §6.4 rule 4): an overview with revenue/commission/
+  order-status figures computed honestly from this run's own schema (no
+  fabricated views/conversion sparklines — those need the analytics event
+  stream, TDD §3.6 module 41, not yet built); a product list with
+  submit-for-review/archive actions (`App\Services\ProductService`,
+  unchanged); an order list with shipment assignment
+  (`App\Services\ShippingService::assign()`, unchanged); and delivery
+  rate-card management (a seller "opts into" a zone by creating a rate
+  card for it, TDD §3.4 module 25).
+- **Shipper dashboard**: a card list (not a table — TDD §4.3's own reason:
+  field use on mobile is primary) of assigned deliveries with a one-tap
+  "next status" action, proof-of-delivery photo + signature capture on
+  the final step, and a pooled/unclaimed-shipments list to claim from
+  (`App\Services\ShippingService::claim()`, unchanged).
+- **Admin dashboard**: a seller-approval queue and a product-moderation
+  queue (both purpose-built worklists per TDD §4.4, not a generic list
+  table — filtered to `under_review`/`pending_review` rows), reusing
+  `KycReviewService`/`ProductService` exactly as the API does, and an
+  audit-log viewer (`audit_logs`, read-only, monospace actor/action
+  columns per TDD §8.9).
+- Every dashboard controller calls into the same service classes and
+  Policies the `/api/v1` endpoints already use — no business logic is
+  duplicated between the two surfaces, only the presentation layer is new.
+- Feature tests (`tests/Feature/Dashboard/DashboardTest.php`): login/
+  register views render, a buyer manages orders and addresses (and can't
+  view another buyer's order), a seller manages products/delivery/
+  shipment-assignment (and can't reach another seller's product — 404,
+  not 403), a shipper claims a pooled shipment and drives it through to
+  delivered with proof-of-delivery capture, and an admin approves a
+  seller and a product end-to-end through the dashboard forms.
+
+### Deferred / flagged
+
+- **No seller/shipper self-service "become a X" web flow yet** — both are
+  fully functional via the tested API
+  (`POST /api/v1/seller/register`, `POST /api/v1/shipper/register`);
+  only the web form is missing. A user who registers via the API already
+  sees the right dashboard section appear (the sidebar checks
+  `$user->seller`/`$user->shipper` directly).
+- **No web product-creation form** (category picker, dynamic variant
+  rows) — the seller dashboard manages products that already exist
+  (submit for review, archive); creation itself is API-only for now,
+  same reasoning as above.
+- **No MFA enforcement.** TDD §8.2 requires MFA for seller/admin roles;
+  Fortify's two-factor feature is registered and its underlying routes
+  work, but nothing in this run requires it at login or exposes a setup
+  UI. Flagged as a follow-up, not silently dropped.
+- **Seller dashboard overview omits views/conversion/sparkline figures**
+  that Design System §6.11 specifies — they need the analytics event
+  stream (TDD §3.6 module 41), which doesn't exist yet. Revenue,
+  commission-owed and order-status counts are real, not placeholder,
+  figures.
+- **No audit-log filtering** (TDD §8.9 says "filterable") — this run's
+  viewer is a plain paginated, most-recent-first table.
+- **Visual fidelity is functional, not pixel-complete** against Design
+  System §6.11: no seller-mode blue-900 sidebar inversion, no collapsible
+  icon-rail, no KPI sparklines/delta chips, no dense-mode admin tables.
+  The exit criterion is "a functional operational home base," which
+  every role now has; the remaining polish is cosmetic follow-up.
+
 ## Run 1.6 — Fulfilment
 
 Scope: TDD §14, stage 1.6 — shipping, the shipper role, order tracking,

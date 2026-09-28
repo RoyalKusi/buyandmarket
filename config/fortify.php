@@ -32,7 +32,7 @@ return [
 
     'lowercase_usernames' => true,
 
-    'home' => '/home',
+    'home' => '/dashboard',
 
     'prefix' => '',
 

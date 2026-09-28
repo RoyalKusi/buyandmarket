@@ -80,6 +80,22 @@ class User extends Authenticatable
         return $this->hasOne(Shipper::class);
     }
 
+    /**
+     * @return HasMany<Order, $this>
+     */
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
+
+    /**
+     * @return HasMany<Address, $this>
+     */
+    public function addresses(): HasMany
+    {
+        return $this->hasMany(Address::class);
+    }
+
     protected static function booted(): void
     {
         // TDD §6.2: "phone or email required, not both nullable."

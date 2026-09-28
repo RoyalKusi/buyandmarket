@@ -1,0 +1,175 @@
+<?php
+
+namespace Tests\Feature\Dashboard;
+
+use App\Models\Address;
+use App\Models\DeliveryRateCard;
+use App\Models\DeliveryZone;
+use App\Models\Order;
+use App\Models\OrderGroup;
+use App\Models\Product;
+use App\Models\Seller;
+use App\Models\Shipper;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
+
+/**
+ * TDD §14 Run 1.7 exit criterion: "Each role has a functional operational
+ * home base." These tests drive the dashboard shell's actual write paths
+ * (not just that a page renders) for every role.
+ */
+class DashboardTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_login_and_register_views_render(): void
+    {
+        $this->get('/login')->assertOk()->assertSee('Sign in');
+        $this->get('/register')->assertOk()->assertSee('Create your account');
+    }
+
+    public function test_a_buyer_can_view_orders_and_manage_addresses(): void
+    {
+        $buyer = User::factory()->withRole('buyer')->create();
+        $order = Order::factory()->for($buyer)->create();
+
+        $this->actingAs($buyer)->get('/dashboard')->assertOk()->assertSee($order->order_number);
+        $this->actingAs($buyer)->get("/dashboard/orders/{$order->id}")->assertOk();
+
+        $this->actingAs($buyer)->post('/dashboard/addresses', [
+            'label' => 'Home',
+            'recipient_name' => 'Tinashe Moyo',
+            'phone' => '0771234567',
+            'province' => 'Harare',
+            'city' => 'Harare',
+            'area' => 'Avondale',
+            'street_address' => '12 Sample Ave',
+        ])->assertRedirect();
+
+        $address = Address::where('user_id', $buyer->id)->firstOrFail();
+        $this->actingAs($buyer)->get('/dashboard/addresses')->assertOk()->assertSee('Home');
+
+        $this->actingAs($buyer)->delete("/dashboard/addresses/{$address->id}")->assertRedirect();
+        $this->assertDatabaseMissing('addresses', ['id' => $address->id]);
+    }
+
+    public function test_a_buyer_cannot_view_another_buyers_order(): void
+    {
+        $buyer = User::factory()->withRole('buyer')->create();
+        $otherOrder = Order::factory()->for(User::factory()->withRole('buyer'))->create();
+
+        $this->actingAs($buyer)->get("/dashboard/orders/{$otherOrder->id}")->assertForbidden();
+    }
+
+    public function test_a_seller_can_manage_products_orders_and_delivery(): void
+    {
+        $seller = Seller::factory()->active()->create();
+        $product = Product::factory()->for($seller->store)->create(['status' => 'draft']);
+
+        $this->actingAs($seller->user)
+            ->post("/seller/dashboard/products/{$product->id}/submit")
+            ->assertRedirect();
+        $this->assertSame('pending_review', $product->fresh()->status);
+
+        $zone = DeliveryZone::factory()->create();
+        $this->actingAs($seller->user)->post('/seller/dashboard/delivery', [
+            'zone_id' => $zone->id,
+            'method' => 'standard',
+            'base_fee' => '3.50',
+            'eta_min_days' => 2,
+            'eta_max_days' => 4,
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('delivery_rate_cards', [
+            'seller_id' => $seller->id,
+            'zone_id' => $zone->id,
+            'method' => 'standard',
+        ]);
+
+        $order = Order::factory()->for(User::factory()->withRole('buyer'))->create(['status' => 'confirmed']);
+        $orderGroup = OrderGroup::factory()->for($order)->for($seller)->create(['status' => 'confirmed']);
+
+        $this->actingAs($seller->user)->post("/seller/dashboard/order-groups/{$orderGroup->id}/shipment", [
+            'zone_id' => $zone->id,
+            'method' => 'standard',
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('order_group_shipments', ['order_group_id' => $orderGroup->id]);
+    }
+
+    public function test_a_seller_cannot_manage_another_sellers_product(): void
+    {
+        $seller = Seller::factory()->active()->create();
+        $otherSeller = Seller::factory()->active()->create();
+        $otherProduct = Product::factory()->for($otherSeller->store)->create(['status' => 'draft']);
+
+        $this->actingAs($seller->user)
+            ->post("/seller/dashboard/products/{$otherProduct->id}/submit")
+            ->assertNotFound();
+    }
+
+    public function test_a_shipper_can_claim_and_progress_a_delivery(): void
+    {
+        Storage::fake('shipments');
+
+        $seller = Seller::factory()->active()->create();
+        $zone = DeliveryZone::factory()->create();
+        DeliveryRateCard::factory()->for($seller)->for($zone, 'zone')->create(['method' => 'standard']);
+        $order = Order::factory()->for(User::factory()->withRole('buyer'))->create(['status' => 'confirmed']);
+        $orderGroup = OrderGroup::factory()->for($order)->for($seller)->create(['status' => 'confirmed']);
+
+        $this->actingAs($seller->user)->post("/seller/dashboard/order-groups/{$orderGroup->id}/shipment", [
+            'zone_id' => $zone->id,
+            'method' => 'standard',
+        ])->assertRedirect();
+
+        $shipment = $orderGroup->fresh()->shipment;
+
+        $shipperUser = User::factory()->withRole('shipper')->create();
+        $shipper = Shipper::factory()->for($shipperUser)->create();
+
+        $this->actingAs($shipperUser)
+            ->post("/shipper/dashboard/shipments/{$shipment->id}/claim")
+            ->assertRedirect();
+
+        $this->assertSame($shipper->id, $shipment->fresh()->shipper_id);
+
+        $this->actingAs($shipperUser)->post("/shipper/dashboard/shipments/{$shipment->id}/events", [
+            'event_type' => 'picked_up',
+        ])->assertRedirect();
+
+        $this->assertSame('picked_up', $shipment->fresh()->status);
+
+        $this->actingAs($shipperUser)->post("/shipper/dashboard/shipments/{$shipment->id}/events", [
+            'event_type' => 'delivered',
+            'photo' => UploadedFile::fake()->image('proof.jpg'),
+            'signature' => UploadedFile::fake()->image('signature.png'),
+        ])->assertRedirect();
+
+        $this->assertSame('delivered', $shipment->fresh()->status);
+        $this->assertSame('completed', $orderGroup->fresh()->status);
+    }
+
+    public function test_admin_can_approve_a_seller_and_a_product(): void
+    {
+        $admin = User::factory()->withRole('admin')->create();
+
+        $seller = Seller::factory()->create(['status' => 'under_review', 'kyc_status' => 'pending']);
+        $this->actingAs($admin)
+            ->post("/admin/dashboard/sellers/{$seller->id}/approve")
+            ->assertRedirect();
+        $this->assertSame('active', $seller->fresh()->status);
+
+        $activeSeller = Seller::factory()->active()->create();
+        $product = Product::factory()->for($activeSeller->store)->create(['status' => 'pending_review']);
+        $this->actingAs($admin)
+            ->post("/admin/dashboard/products/{$product->id}/approve")
+            ->assertRedirect();
+        $this->assertSame('published', $product->fresh()->status);
+
+        $this->actingAs($admin)->get('/admin/dashboard/audit-log')->assertOk()->assertSee('seller.kyc_approved');
+    }
+}
