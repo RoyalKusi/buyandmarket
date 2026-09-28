@@ -19,11 +19,23 @@ class Product extends Model
         'category_id',
         'brand_id',
         'title',
+        'slug',
         'description',
         'base_price',
         'status',
         'stock_quantity',
     ];
+
+    /**
+     * PDP URLs use the slug (App\Services\ProductService generates it from
+     * the title at creation) via explicit {product:slug} route bindings —
+     * the API keeps id-based binding, so this is opt-in per route, not a
+     * global override of getRouteKeyName().
+     */
+    public function scopePublished(Builder $query): void
+    {
+        $query->where('status', 'published');
+    }
 
     protected function casts(): array
     {

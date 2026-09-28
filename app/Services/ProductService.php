@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\Seller;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -55,6 +56,7 @@ class ProductService
                 'category_id' => $data['category_id'],
                 'brand_id' => $data['brand_id'] ?? null,
                 'title' => $data['title'],
+                'slug' => $this->uniqueSlug($data['title']),
                 'description' => $data['description'] ?? null,
                 'base_price' => $data['base_price'],
                 'status' => 'draft',
@@ -208,5 +210,23 @@ class ProductService
                 'status' => "Product must be in '{$expected}' status for this transition (currently '{$product->status}').",
             ]);
         }
+    }
+
+    /**
+     * Generated, never seller-entered, so it always stays URL-safe and
+     * unique — a numeric suffix disambiguates two sellers listing
+     * identically-titled products.
+     */
+    private function uniqueSlug(string $title): string
+    {
+        $base = Str::slug($title);
+        $slug = $base;
+        $suffix = 1;
+
+        while (Product::withTrashed()->where('slug', $slug)->exists()) {
+            $slug = "{$base}-".++$suffix;
+        }
+
+        return $slug;
     }
 }

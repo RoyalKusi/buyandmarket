@@ -3,6 +3,105 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Run 1.4 — Storefront
+
+Scope: TDD §14, stage 1.4 — homepage, search, category, PDP, store pages
+(Design System §6.1-6.5), including skeleton and empty/error states
+(Design System §5.3-5.4).
+
+### Added
+
+- `App\Contracts\SearchProvider` + `App\Services\Search\
+  EloquentSearchProvider` (TDD §2.1 non-negotiable: an interface from day
+  one, even with one implementation). Uses MySQL `FULLTEXT` (via
+  `whereFullText()`, against the index Run 1.2's products migration
+  already added) with a portable `LIKE` fallback for any other driver —
+  Eloquent's own base grammar throws for drivers that don't implement
+  full-text search, so the fallback is what keeps the exact same call
+  site working under the SQLite database this app's tests run on. Only
+  published products from stores whose seller is `active` are ever
+  returned (TDD §5.2's retrieval-visibility rule, applied here too, not
+  just in the future AI/RAG path).
+  - Bound in `AppServiceProvider` — swapping to Meilisearch/Typesense
+    later (TDD §13 stage 4) is a second implementation and a one-line
+    binding change, never a call-site change.
+- `App\Livewire\ProductGrid`: the shared filter/sort/paginate component
+  Design System §6.3 calls for ("a category page is architecturally
+  search pre-scoped to one category — one component set serves both").
+  Mounted with a locked `categoryId` (category pages), a locked
+  `storeId` (store pages), or free-text `q` (search) and reused across
+  all three page types.
+- Storefront routes/controllers/views for the homepage, search results,
+  category pages, PDP, and store pages (`App\Http\Controllers\
+  Storefront\*`), all against the exact Tailwind tokens from Run 1.1's
+  `tailwind.config.js` — no arbitrary values anywhere in the new Blade
+  templates.
+- `<x-product-tile>` (Design System §4.3, "the single most repeated
+  component"), `<x-store-card>`, `<x-breadcrumbs>`, `<x-empty-state>`
+  (§5.4: illustration + heading + one clear action, never a bare "no
+  results"), and `<x-skeleton.product-tile>` (§5.3: exact box model of
+  the real tile, `prefers-reduced-motion`-aware shimmer per §5.2) as
+  reusable Blade components.
+- Products gained a `slug` column (additive migration, TDD §12.2) and
+  `App\Services\ProductService` now generates one from the title at
+  creation — TDD §6.2's products entity reference doesn't list a slug,
+  but the storefront needs stable, readable PDP URLs; the API keeps
+  id-based route binding unchanged (`{product:slug}` is opt-in per web
+  route, not a global model change).
+
+### Verified against acceptance criteria (TDD §16 / Run 1.4 exit criteria)
+
+- "A buyer can browse and reach a PDP entirely through the built UI":
+  `BrowseToPdpTest` drives three independent paths — homepage → store →
+  PDP, category page → PDP, search → PDP — all through real HTTP
+  requests against real rendered HTML, plus confirms a draft product
+  is unreachable (403) from the public storefront.
+- `ProductGridTest` covers the search/filter contract directly: only
+  published products from active sellers' stores are ever returned,
+  text search matches, category/price filters narrow correctly, and a
+  zero-result query renders the empty state.
+- 61 tests / 155 assertions passing (9 new); Pint clean; migrations run
+  clean fresh and reversible; production CSS/JS build still measures
+  38.86KB gzipped JS (unchanged — no new JS shipped) against the TDD
+  §9.1 100KB budget.
+- Two real bugs caught running the suite before they shipped: a Blade
+  attribute expression with escaped nested quotes that silently broke
+  template compilation, and `whereFullText()`'s assumption that it
+  degrades gracefully on every database driver (it doesn't — only
+  MySQL/PostgreSQL's grammars implement it; SQLite's throws). Both
+  fixed; the fix is documented inline in `EloquentSearchProvider`.
+
+### Deferred / flagged for a later run
+
+Every omission below is called out inline, in the view/controller that
+omits it, not just here — each is a real gap, not a silently-lowered bar:
+
+- Homepage: hero carousel, "Deals near you" (geolocation ranking),
+  AI-curated "Picked for you", sponsored placement block, trust strip —
+  each needs a module (campaign content, geolocation, AI/RAG, ads,
+  aggregate trust stats) this build hasn't reached yet.
+- Header: category mega-menu, AI-assistant entry icon, account/wishlist/
+  cart icon cluster (cart and wishlist have no backing module until Run
+  1.5/§3.5); mobile bottom tab bar, for the same reason.
+- PDP: real image gallery (Run 1.9's image pipeline), rating row and
+  reviews tab content (module 33), related/recently-viewed rails (module
+  40), the AI "Ask about this product" entry point (Run 1.8). Add to
+  cart / Buy now render per spec but are disabled with an explanatory
+  label — never silently inert.
+- Store pages: banner image, avatar overlap, Follow/Message buttons, and
+  every tab beyond "All Products" (Categories/About/Reviews/Policies).
+- Search: the search-as-you-type suggestion dropdown (§6.2) and the
+  dual-handle price-range slider (rendered as two plain number inputs
+  instead) — both are their own small JS components better built once
+  more Alpine patterns exist elsewhere in the storefront.
+- Sponsored/ad placements and their frequency capping (§6.9) — modules
+  15/16 aren't built.
+- axe-core accessibility scanning isn't wired into CI yet (TDD §11) —
+  needs a headless-browser step this run didn't set up; the components
+  built here follow the Design System's accessibility rules (landmarks,
+  `aria-current`, `sr-only` labels, focus-visible rings) but aren't yet
+  machine-verified.
+
 ## Run 1.3 — Seller onboarding
 
 Scope: TDD §14, stage 1.3 — registration, KYC, store creation (§3.1

@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use App\Contracts\SearchProvider;
 use App\Models\User;
+use App\Services\Search\EloquentSearchProvider;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -14,7 +16,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // TDD §2.1/§13 stage 4: the only place that ever changes when the
+        // platform moves off MySQL full-text onto Meilisearch/Typesense.
+        $this->app->bind(SearchProvider::class, EloquentSearchProvider::class);
     }
 
     /**
