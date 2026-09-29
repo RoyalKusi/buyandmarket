@@ -43,6 +43,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/products', [SellerController::class, 'products'])->name('products');
         Route::post('/products/{product}/submit', [SellerController::class, 'submitProductForReview'])->name('products.submit');
         Route::post('/products/{product}/archive', [SellerController::class, 'archiveProduct'])->name('products.archive');
+        Route::post('/products/{product}/ai-description', [SellerController::class, 'suggestDescription'])->name('products.ai-description.suggest');
+        Route::post('/products/{product}/ai-description/accept', [SellerController::class, 'acceptDescription'])->name('products.ai-description.accept');
+        Route::post('/products/{product}/ai-description/discard', [SellerController::class, 'discardDescription'])->name('products.ai-description.discard');
         Route::get('/orders', [SellerController::class, 'orders'])->name('orders');
         Route::post('/order-groups/{orderGroup}/shipment', [SellerController::class, 'assignShipment'])->name('orders.shipment');
         Route::get('/delivery', [SellerController::class, 'delivery'])->name('delivery');
@@ -63,5 +66,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/products/{product}/approve', [AdminController::class, 'approveProduct'])->name('products.approve');
         Route::post('/products/{product}/reject', [AdminController::class, 'rejectProduct'])->name('products.reject');
         Route::get('/audit-log', [AdminController::class, 'auditLog'])->name('audit-log');
+        Route::get('/ai-monitoring', [AdminController::class, 'aiMonitoring'])->name('ai-monitoring');
     });
 });

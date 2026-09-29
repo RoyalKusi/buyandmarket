@@ -7,6 +7,8 @@ use App\Models\DeliveryRateCard;
 use App\Models\DeliveryZone;
 use App\Models\OrderGroup;
 use App\Models\Product;
+use App\Models\ProductVariant;
+use App\Services\Ai\ListingAssistant;
 use App\Services\ProductService;
 use App\Services\ShippingService;
 use Illuminate\Http\RedirectResponse;
@@ -31,12 +33,68 @@ class SellerController extends Controller
             'revenue' => $orderGroups->whereIn('status', ['completed'])->sum(fn ($g) => (float) $g->subtotal),
             'pendingCommission' => $orderGroups->whereNotIn('status', ['cancelled', 'refunded'])->sum(fn ($g) => (float) $g->commission_amount),
             'statusCounts' => $orderGroups->countBy('status'),
+            // TDD §5.6 "inventory alerts": low-stock/reorder-point
+            // suggestions from sales velocity — this run has no
+            // analytics event stream (module 41) to compute velocity
+            // from, so it's a plain stock-quantity threshold instead,
+            // deterministic rather than AI-generated (flagged in
+            // CHANGELOG.md).
+            'lowStockVariants' => ProductVariant::query()
+                ->whereHas('product', fn ($q) => $q->where('status', 'published'))
+                ->where('stock_quantity', '<=', 5)
+                ->with('product')
+                ->get(),
         ]);
     }
 
     public function products(): View
     {
-        return view('dashboard.seller.products', ['products' => Product::query()->latest()->paginate(15)]);
+        $products = Product::query()->latest()->paginate(15);
+
+        // TDD §5.6 "pricing insights": compares a seller's price against
+        // the category price distribution — computed directly here
+        // rather than narrated by the LLM, since a deterministic
+        // average/min/max is more trustworthy than an LLM restating
+        // arithmetic (flagged in CHANGELOG.md as a simplification from
+        // the TDD's "AI-generated advisory range" framing).
+        $categoryPriceStats = Product::query()
+            ->where('status', 'published')
+            ->whereIn('category_id', $products->pluck('category_id')->filter()->unique())
+            ->selectRaw('category_id, AVG(base_price) as avg_price, MIN(base_price) as min_price, MAX(base_price) as max_price')
+            ->groupBy('category_id')
+            ->get()
+            ->keyBy('category_id');
+
+        return view('dashboard.seller.products', ['products' => $products, 'categoryPriceStats' => $categoryPriceStats]);
+    }
+
+    public function suggestDescription(Request $request, Product $product, ListingAssistant $assistant): RedirectResponse
+    {
+        $this->authorize('update', $product);
+
+        $data = $request->validate(['bullets' => ['required', 'string', 'max:1000']]);
+
+        $assistant->suggestDescription($product, $data['bullets'], $request->user());
+
+        return back()->with('status', 'AI description suggestion ready below — review before accepting.');
+    }
+
+    public function acceptDescription(Request $request, Product $product, ListingAssistant $assistant): RedirectResponse
+    {
+        $this->authorize('update', $product);
+
+        $assistant->acceptDescription($product, $request->user());
+
+        return back()->with('status', 'Description updated.');
+    }
+
+    public function discardDescription(Request $request, Product $product, ListingAssistant $assistant): RedirectResponse
+    {
+        $this->authorize('update', $product);
+
+        $assistant->discardDescription($product, $request->user());
+
+        return back()->with('status', 'Suggestion discarded.');
     }
 
     public function submitProductForReview(Product $product, ProductService $productService): RedirectResponse

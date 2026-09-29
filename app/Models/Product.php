@@ -21,6 +21,7 @@ class Product extends Model
         'title',
         'slug',
         'description',
+        'ai_suggested_description',
         'base_price',
         'status',
         'stock_quantity',

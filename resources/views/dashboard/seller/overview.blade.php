@@ -18,7 +18,7 @@
         </div>
     </div>
 
-    <div class="bg-slate-0 border border-slate-100 rounded-md p-6">
+    <div class="bg-slate-0 border border-slate-100 rounded-md p-6 mb-6">
         <h2 class="text-heading-sm font-display text-slate-900 mb-4">Orders by status</h2>
         <div class="flex flex-wrap gap-3">
             @forelse ($statusCounts as $status => $count)
@@ -29,5 +29,24 @@
                 <p class="text-body-md text-slate-500">No orders yet.</p>
             @endforelse
         </div>
+    </div>
+
+    {{-- TDD §5.6 "inventory alerts" (see App\Http\Controllers\Dashboard\
+         SellerController::overview for why this is a stock threshold,
+         not a sales-velocity reorder point). --}}
+    <div class="bg-slate-0 border border-slate-100 rounded-md p-6">
+        <h2 class="text-heading-sm font-display text-slate-900 mb-4">Low stock</h2>
+        @if ($lowStockVariants->isEmpty())
+            <p class="text-body-md text-slate-500">Nothing running low.</p>
+        @else
+            <ul class="divide-y divide-slate-100">
+                @foreach ($lowStockVariants as $variant)
+                    <li class="py-2 flex items-center justify-between text-body-md">
+                        <span>{{ $variant->product->title }} ({{ $variant->sku }})</span>
+                        <span class="inline-flex items-center rounded-xs px-2 py-1 text-caption bg-amber-50 text-amber-700 tabular-nums">{{ $variant->stock_quantity }} left</span>
+                    </li>
+                @endforeach
+            </ul>
+        @endif
     </div>
 </x-layouts.dashboard>

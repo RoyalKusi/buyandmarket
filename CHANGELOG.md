@@ -3,6 +3,88 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Run 1.11 — AI platform v2
+
+Scope: TDD §14, stage 1.11 — seller/admin AI tools (§5.6), an AI
+monitoring panel (§5.7). Exit criterion: "Sellers actively using
+AI-assisted listing; admin AI dashboard populated with real metrics."
+
+**Run ordering note**: stages 1.9 (migration execution against
+production legacy WordPress/WooCommerce data) and 1.10 (DNS cutover,
+post-launch monitoring) are skipped here, not silently — both are
+inherently unavailable in this environment: 1.9 needs the actual legacy
+database/media to migrate from, and 1.10 needs real hosting/DNS to cut
+over. Neither is a coding task this sandbox can do a defensible version
+of the way 1.5's "unverified payment gateway" or 1.8's "unverified LLM
+provider" caveats let those runs proceed with a flagged limitation. 1.11
+has no such external dependency, so it's next.
+
+### Added
+
+- **`App\Services\Ai\ListingAssistant`** (TDD §5.6 "product-description
+  generation"): bullets in, a description suggestion out via
+  `LlmProvider`, written to a new `products.ai_suggested_description`
+  column that sits beside the real `description` until the seller
+  explicitly Accepts or Discards it (TDD §3.2 rule 7's "never
+  auto-published," applied here to an existing field rather than a
+  separate `product_drafts` table — this codebase already represents a
+  product's draft state as `products.status = 'draft'`, so a second
+  drafts table would duplicate that). The seller's own title is never
+  touched — no image-upload pipeline exists yet (flagged since Run 1.8)
+  to ground a title suggestion in.
+- Seller dashboard: each product card in `/seller/dashboard/products`
+  gets a "Generate with AI" input when it has no pending suggestion, or
+  the Design System §7.7 AI-suggestion panel (dashed border, Accept/
+  Discard) when it does.
+- **Pricing insights** (TDD §5.6): the products page shows each
+  product's price against its category's average/min/max among other
+  published products — computed directly with a `GROUP BY` query, not
+  narrated by the LLM. TDD frames this as an "AI-generated advisory
+  range"; a deterministic aggregate is strictly more trustworthy than an
+  LLM restating arithmetic, so this run computes it rather than routing
+  a number through a model that could get it wrong.
+- **Inventory alerts** (TDD §5.6): the seller overview page lists
+  variants at or below a stock-quantity threshold. TDD's own framing is
+  "low-stock/reorder-point suggestions from sales velocity" — there's no
+  analytics event stream (module 41) to compute velocity from, so this
+  is a plain threshold, not a reorder-point model.
+- **Admin AI monitoring panel** (`/admin/dashboard/ai-monitoring`, TDD
+  §5.7/§6.11): conversation and message counts, tool-call counts by
+  name (from `audit_logs` — every `ai.tool.*`/`ai.suggestion.*` action
+  Run 1.8/this run write), pending-vs-confirmed state-changing actions,
+  and seller listing-assistant usage (generated/accepted/discarded).
+  Every number here is a real count from this run's own tables — see
+  "Deferred" for the TDD §5.7 signals this run has no data to compute.
+- Feature tests (`tests/Feature/Ai/ListingAssistantTest.php`): generate
+  → accept (description updates, suggestion clears, both steps
+  audit-logged), generate → discard (real description untouched),
+  cross-seller isolation (404, not 403), and the admin panel rendering
+  real counts.
+
+### Deferred / flagged
+
+- **No product categorisation or attribute-extraction suggestions**
+  (TDD §5.6) — both are meaningfully vision-dependent (extracting
+  colour/material from a photo, suggesting a category from an image),
+  and no product-image pipeline exists (§5.8, flagged since Run 1.8).
+- **No sales summaries or seller performance insights** — both need the
+  analytics event stream (module 41), which doesn't exist.
+- **No customer-response assistance or ad/sponsored-product
+  recommendations** — both need modules that don't exist yet (a
+  buyer-seller messaging/reviews surface; sponsored_campaigns, module
+  15).
+- **AI monitoring panel omits grounding-failure rate, escalation-to-
+  human rate, and per-tool latency** (TDD §5.7's full signal list) —
+  there's no `escalate_to_support` tool (support_tickets doesn't exist),
+  no per-call latency capture, and "grounding failure" as the TDD
+  defines it (a response flagged with no supporting citation) isn't
+  measurable post hoc without storing it at generation time, which this
+  run doesn't add. Real counts only; nothing here is a placeholder
+  metric.
+- **No proactive notifications** (price-drop/back-in-stock/delivery
+  updates surfaced by the assistant, TDD §5.6/§7.6) — the notifications
+  module itself (36) doesn't exist yet.
+
 ## Run 1.8 — AI platform v1
 
 Scope: TDD §14, stage 1.8 — RAG ingestion/retrieval, the buyer-facing

@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Dashboard;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\Conversation;
+use App\Models\ConversationMessage;
 use App\Models\Product;
 use App\Models\Seller;
 use App\Services\KycReviewService;
@@ -84,6 +86,30 @@ class AdminController extends Controller
     {
         return view('dashboard.admin.audit-log', [
             'entries' => AuditLog::with('actor')->latest('created_at')->paginate(25),
+        ]);
+    }
+
+    /**
+     * TDD §5.7/§6.11 "AI system monitoring panel": query volume,
+     * tool-call success/denial rate, escalation-to-human rate,
+     * per-tool latency. Only the signals this run's own schema can
+     * compute honestly are shown — no escalate_to_support tool or
+     * per-call latency capture exists yet (both flagged in
+     * CHANGELOG.md), so those rows are omitted rather than faked.
+     */
+    public function aiMonitoring(): View
+    {
+        $toolCalls = AuditLog::where('action', 'like', 'ai.tool.%')->get();
+
+        return view('dashboard.admin.ai-monitoring', [
+            'conversationCount' => Conversation::count(),
+            'messageCounts' => ConversationMessage::query()->selectRaw('role, count(*) as total')->groupBy('role')->pluck('total', 'role'),
+            'toolCallCounts' => $toolCalls->countBy(fn (AuditLog $log) => str($log->action)->after('ai.tool.')),
+            'pendingConfirmations' => ConversationMessage::where('requires_confirmation', true)->where('confirmed', false)->count(),
+            'confirmedActions' => ConversationMessage::where('requires_confirmation', true)->where('confirmed', true)->count(),
+            'suggestionsGenerated' => AuditLog::where('action', 'ai.suggestion.generated')->count(),
+            'suggestionsAccepted' => AuditLog::where('action', 'ai.suggestion.accepted')->count(),
+            'suggestionsDiscarded' => AuditLog::where('action', 'ai.suggestion.discarded')->count(),
         ]);
     }
 }
