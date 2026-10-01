@@ -25,6 +25,21 @@ class DashboardTest extends TestCase
 {
     use RefreshDatabase;
 
+    /**
+     * TDD §8.2 / App\Http\Middleware\EnsureTwoFactorEnabled: seller and
+     * admin dashboard routes require 2FA. Seller::factory() builds its
+     * own User internally, so this is applied after the fact rather than
+     * through a factory state chain.
+     */
+    private function enableTwoFactor(User $user): void
+    {
+        $user->forceFill([
+            'two_factor_secret' => encrypt('test-secret'),
+            'two_factor_recovery_codes' => encrypt(json_encode(['recovery-code-1'])),
+            'two_factor_confirmed_at' => now(),
+        ])->save();
+    }
+
     public function test_login_and_register_views_render(): void
     {
         $this->get('/login')->assertOk()->assertSee('Sign in');
@@ -67,6 +82,7 @@ class DashboardTest extends TestCase
     public function test_a_seller_can_manage_products_orders_and_delivery(): void
     {
         $seller = Seller::factory()->active()->create();
+        $this->enableTwoFactor($seller->user);
         $product = Product::factory()->for($seller->store)->create(['status' => 'draft']);
 
         $this->actingAs($seller->user)
@@ -103,6 +119,7 @@ class DashboardTest extends TestCase
     public function test_a_seller_cannot_manage_another_sellers_product(): void
     {
         $seller = Seller::factory()->active()->create();
+        $this->enableTwoFactor($seller->user);
         $otherSeller = Seller::factory()->active()->create();
         $otherProduct = Product::factory()->for($otherSeller->store)->create(['status' => 'draft']);
 
@@ -116,6 +133,7 @@ class DashboardTest extends TestCase
         Storage::fake('shipments');
 
         $seller = Seller::factory()->active()->create();
+        $this->enableTwoFactor($seller->user);
         $zone = DeliveryZone::factory()->create();
         DeliveryRateCard::factory()->for($seller)->for($zone, 'zone')->create(['method' => 'standard']);
         $order = Order::factory()->for(User::factory()->withRole('buyer'))->create(['status' => 'confirmed']);
@@ -156,6 +174,7 @@ class DashboardTest extends TestCase
     public function test_admin_can_approve_a_seller_and_a_product(): void
     {
         $admin = User::factory()->withRole('admin')->create();
+        $this->enableTwoFactor($admin);
 
         $seller = Seller::factory()->create(['status' => 'under_review', 'kyc_status' => 'pending']);
         $this->actingAs($admin)

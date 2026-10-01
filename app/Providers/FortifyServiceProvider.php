@@ -37,6 +37,16 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::loginView('auth.login');
         Fortify::registerView('auth.register');
 
+        // TDD §8.2: TOTP two-factor is registered (config/fortify.php)
+        // with 'confirmPassword' => true, which gates every two-factor
+        // management route behind Fortify's own 'password.confirm'
+        // middleware — both of these views were missing entirely (same
+        // class of gap Run 1.7 found with login/register): a seller/admin
+        // trying to set up 2FA, or a user with 2FA enabled trying to log
+        // in, would 500 on a missing view binding.
+        Fortify::twoFactorChallengeView('auth.two-factor-challenge');
+        Fortify::confirmPasswordView('auth.confirm-password');
+
         Fortify::createUsersUsing(CreateNewUser::class);
         Fortify::updateUserProfileInformationUsing(UpdateUserProfileInformation::class);
         Fortify::updateUserPasswordsUsing(UpdateUserPassword::class);

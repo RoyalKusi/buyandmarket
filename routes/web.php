@@ -55,9 +55,16 @@ Route::middleware('auth')->group(function () {
     Route::delete('/dashboard/addresses/{address}', [BuyerController::class, 'destroyAddress'])->name('dashboard.addresses.destroy');
     Route::view('/dashboard/assistant', 'dashboard.assistant')->name('dashboard.assistant');
 
+    // TDD §8.2: "MFA required for seller ... and all admin/sub-admin
+    // roles" — enabling/disabling it is itself a sensitive action, so
+    // this page sits behind Fortify's own 'password.confirm' gate (same
+    // protection level config/fortify.php already configures for its own
+    // two-factor routes).
+    Route::view('/dashboard/security', 'dashboard.security')->middleware('password.confirm')->name('dashboard.security');
+
     // TDD §6.4 rule 4: seller.scope keeps every query here confined to
     // the acting seller's own rows, same guarantee as the API.
-    Route::prefix('seller/dashboard')->name('seller.dashboard.')->middleware('seller.scope')->group(function () {
+    Route::prefix('seller/dashboard')->name('seller.dashboard.')->middleware(['seller.scope', '2fa'])->group(function () {
         Route::get('/', [SellerController::class, 'overview'])->name('index');
         Route::get('/products', [SellerController::class, 'products'])->name('products');
         Route::post('/products/{product}/submit', [SellerController::class, 'submitProductForReview'])->name('products.submit');
@@ -77,7 +84,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/shipments/{shipment}/events', [ShipperController::class, 'storeEvent'])->name('events.store');
     });
 
-    Route::prefix('admin/dashboard')->name('admin.dashboard.')->middleware('role:admin')->group(function () {
+    Route::prefix('admin/dashboard')->name('admin.dashboard.')->middleware(['role:admin', '2fa'])->group(function () {
         Route::get('/sellers', [AdminController::class, 'sellers'])->name('sellers');
         Route::post('/sellers/{seller}/approve', [AdminController::class, 'approveSeller'])->name('sellers.approve');
         Route::post('/sellers/{seller}/reject', [AdminController::class, 'rejectSeller'])->name('sellers.reject');

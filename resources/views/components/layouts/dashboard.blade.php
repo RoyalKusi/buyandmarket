@@ -30,6 +30,7 @@
                     <a href="{{ route('dashboard') }}" class="block rounded-sm px-3 py-2 {{ $active === 'buyer' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Orders</a>
                     <a href="{{ route('dashboard.addresses') }}" class="block rounded-sm px-3 py-2 {{ $active === 'addresses' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Addresses</a>
                     <a href="{{ route('dashboard.assistant') }}" class="block rounded-sm px-3 py-2 {{ $active === 'assistant' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Ask BM Assistant</a>
+                    <a href="{{ route('dashboard.security') }}" class="block rounded-sm px-3 py-2 {{ $active === 'security' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Security</a>
                 </div>
 
                 @if ($user?->seller)

@@ -19,6 +19,11 @@ class ListingAssistantTest extends TestCase
 {
     use RefreshDatabase;
 
+    private function enableTwoFactor(User $user): void
+    {
+        $user->forceFill(['two_factor_secret' => encrypt('x'), 'two_factor_confirmed_at' => now()])->save();
+    }
+
     private function fakeChatContent(string $content): void
     {
         Http::fake([
@@ -31,6 +36,7 @@ class ListingAssistantTest extends TestCase
     public function test_a_seller_can_generate_accept_and_discard_a_description_suggestion(): void
     {
         $seller = Seller::factory()->active()->create();
+        $this->enableTwoFactor($seller->user);
         $product = Product::factory()->for($seller->store)->create(['description' => 'Original description.']);
 
         $this->fakeChatContent('A waterproof speaker with 10 hours of battery life and USB-C charging.');
@@ -57,6 +63,7 @@ class ListingAssistantTest extends TestCase
     public function test_a_seller_can_discard_a_suggestion_without_changing_the_real_description(): void
     {
         $seller = Seller::factory()->active()->create();
+        $this->enableTwoFactor($seller->user);
         $product = Product::factory()->for($seller->store)->create(['description' => 'Kept as-is.']);
 
         $this->fakeChatContent('A suggestion nobody asked to keep.');
@@ -89,6 +96,7 @@ class ListingAssistantTest extends TestCase
     public function test_the_admin_ai_monitoring_dashboard_shows_real_counts(): void
     {
         $seller = Seller::factory()->active()->create();
+        $this->enableTwoFactor($seller->user);
         $product = Product::factory()->for($seller->store)->create();
 
         $this->fakeChatContent('A short generated description.');
@@ -98,6 +106,7 @@ class ListingAssistantTest extends TestCase
         $this->actingAs($seller->user)->post("/seller/dashboard/products/{$product->id}/ai-description/accept");
 
         $admin = User::factory()->withRole('admin')->create();
+        $this->enableTwoFactor($admin);
 
         $this->actingAs($admin)->get('/admin/dashboard/ai-monitoring')
             ->assertOk()

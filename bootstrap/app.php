@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureTwoFactorEnabled;
 use App\Http\Middleware\EnsureUserHasRole;
 use App\Http\Middleware\ScopeQueriesToActingSeller;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -26,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'seller.scope' => ScopeQueriesToActingSeller::class,
             'role' => EnsureUserHasRole::class,
+            '2fa' => EnsureTwoFactorEnabled::class,
         ]);
 
         // Unconditional session support (no CSRF) for guest-cart/checkout

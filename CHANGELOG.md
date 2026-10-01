@@ -3,6 +3,53 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Run 1.13 — Deferred-item polish: MFA enforcement (TDD §8.2)
+
+Scope: continuing the same deferred-item pass as Run 1.12. Run 1.7
+flagged `config/fortify.php` as carrying a comment claiming two-factor
+was "enforced for seller/admin" when nothing actually enforced it, and
+Fortify's two-factor challenge / password-confirmation views didn't
+exist — a seller or admin with 2FA somehow enabled, or trying to set it
+up, would 500 on a missing view binding. TDD §8.2 is explicit: "MFA
+required for seller ... and all admin/sub-admin roles."
+
+### Added
+
+- **`App\Http\Middleware\EnsureTwoFactorEnabled`** (alias `2fa`): redirects
+  any seller/admin user without a confirmed TOTP secret to
+  `/dashboard/security`, applied to the `seller.dashboard.*` and
+  `admin.dashboard.*` route groups. Shippers are not named in TDD §8.2
+  and are left out deliberately.
+- **`/dashboard/security`** (`App\Livewire\TwoFactorSetup`): enable
+  (QR code + confirmation code) / view recovery codes / disable, built
+  directly on Fortify's own `EnableTwoFactorAuthentication`,
+  `ConfirmTwoFactorAuthentication` and `DisableTwoFactorAuthentication`
+  actions rather than re-implementing TOTP. Gated behind Laravel's
+  `password.confirm` middleware — the same protection level
+  `config/fortify.php` already configures for Fortify's own two-factor
+  management routes, since enabling/disabling 2FA is itself a sensitive
+  action.
+- Fortify's missing `twoFactorChallengeView` and `confirmPasswordView`
+  bindings (`auth.two-factor-challenge`, `auth.confirm-password`) — the
+  same class of gap Run 1.7 found and fixed for login/register.
+
+### Verified against acceptance criteria
+
+- Full suite: 100 passed (342 assertions), including the pre-existing
+  dashboard and AI-listing-assistant tests updated to enable 2FA for
+  their seller/admin actors (the new, real requirement).
+- Pint: clean. `migrate:fresh`: clean. Production build: 38.86KB
+  gzipped JS, unchanged from Run 1.12 — this run added no frontend JS.
+
+### Deferred / flagged (still open)
+
+- No "remember this device for 30 days" trusted-device cookie — every
+  login for a 2FA-enrolled seller/admin re-prompts for a code. Not in
+  TDD §8.2's text; flagged as a future UX improvement, not a gap.
+- `/dashboard/security` does not yet show device/session history
+  (TDD §8.2 mentions "manage trusted devices" as a stretch item for a
+  later run).
+
 ## Run 1.12 — Deferred-item polish: storefront commerce UI
 
 Scope: not a TDD-numbered stage — a pass back over every "Deferred /
