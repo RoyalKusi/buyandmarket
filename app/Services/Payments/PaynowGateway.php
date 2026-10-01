@@ -43,7 +43,7 @@ class PaynowGateway extends AbstractPaymentGateway
             'reference' => $reference,
             'amount' => number_format((float) $order->total, 2, '.', ''),
             'additionalinfo' => "BuyAndMarket order {$order->order_number}",
-            'returnurl' => config('services.paynow.return_url'),
+            'returnurl' => config('services.paynow.return_url') ?: $this->defaultReturnUrl(),
             'resulturl' => config('services.paynow.result_url'),
             'authemail' => $order->user?->email ?? $order->guest_email ?? '',
             'status' => 'Message',

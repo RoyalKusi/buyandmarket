@@ -1,4 +1,8 @@
 <div class="bg-slate-900 rounded-md p-4 flex flex-col h-[70vh]">
+    @if ($contextLabel)
+        <p class="mb-3 text-caption text-cyan-500">{{ $contextLabel }}</p>
+    @endif
+
     <div class="flex-1 overflow-y-auto space-y-3 pr-1">
         @forelse ($messages as $message)
             @if ($message->role === 'user')

@@ -5,6 +5,7 @@ use App\Http\Controllers\Dashboard\BuyerController;
 use App\Http\Controllers\Dashboard\SellerController;
 use App\Http\Controllers\Dashboard\ShipperController;
 use App\Http\Controllers\Storefront\CategoryController;
+use App\Http\Controllers\Storefront\CheckoutController;
 use App\Http\Controllers\Storefront\HomeController;
 use App\Http\Controllers\Storefront\ProductController;
 use App\Http\Controllers\Storefront\SearchController;
@@ -20,6 +21,24 @@ Route::name('storefront.')->group(function () {
     Route::get('/categories/{category:slug}', [CategoryController::class, 'show'])->name('categories.show');
     Route::get('/products/{product:slug}', [ProductController::class, 'show'])->name('products.show');
     Route::get('/stores/{store:slug}', [StoreController::class, 'show'])->name('stores.show');
+
+    // Design System §6.6: dedicated checkout page, not a modal. Guest
+    // checkout is fully supported (TDD §5.9) — deliberately outside
+    // auth middleware, same as the API's guest-session cart/checkout
+    // routes (Run 1.5).
+    Route::prefix('checkout')->name('checkout.')->group(function () {
+        Route::get('/start', [CheckoutController::class, 'start'])->name('start');
+        Route::get('/return', [CheckoutController::class, 'return'])->name('return');
+        Route::get('/{checkoutSession}/address', [CheckoutController::class, 'showAddress'])->name('address');
+        Route::post('/{checkoutSession}/address', [CheckoutController::class, 'storeAddress'])->name('address.store');
+        Route::get('/{checkoutSession}/delivery', [CheckoutController::class, 'showDelivery'])->name('delivery');
+        Route::post('/{checkoutSession}/delivery', [CheckoutController::class, 'storeDelivery'])->name('delivery.store');
+        Route::get('/{checkoutSession}/payment', [CheckoutController::class, 'showPayment'])->name('payment');
+        Route::post('/{checkoutSession}/payment', [CheckoutController::class, 'storePayment'])->name('payment.store');
+        Route::get('/{checkoutSession}/failed', [CheckoutController::class, 'failed'])->name('failed');
+        Route::get('/{checkoutSession}/confirmation', [CheckoutController::class, 'confirmation'])->name('confirmation');
+        Route::post('/orders/{order}/upsell', [CheckoutController::class, 'upsell'])->name('upsell');
+    });
 });
 
 // TDD §3.6 modules 27-30 / Design System §6.11: one shared dashboard

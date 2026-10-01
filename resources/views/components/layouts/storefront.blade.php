@@ -43,7 +43,9 @@
                 </div>
             </form>
 
-            <nav aria-label="Account" class="shrink-0 text-body-md">
+            <nav aria-label="Account" class="shrink-0 flex items-center gap-2 text-body-md">
+                <livewire:storefront.cart-drawer />
+
                 @auth
                     <a href="{{ route('dashboard') }}" class="text-slate-600 hover:text-slate-900">My account</a>
                 @else

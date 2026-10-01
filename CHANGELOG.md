@@ -3,6 +3,114 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Run 1.12 — Deferred-item polish: storefront commerce UI
+
+Scope: not a TDD-numbered stage — a pass back over every "Deferred /
+flagged" note across Runs 1.1-1.11, at the user's request, to close the
+highest-value gaps a pure engineering pass can close (no production
+legacy data or real hosting needed, unlike stages 1.9-1.10). By far the
+largest: **the storefront had no working cart, checkout, or order
+confirmation UI** — PDP's Add to cart/Buy now rendered disabled since
+Run 1.4, and Run 1.5's commerce backend, fully tested at the API layer,
+had no web presentation at all. A buyer could not complete a purchase
+through the website.
+
+### Added
+
+- **Cart drawer** (`App\Livewire\Storefront\CartDrawer`, Design System
+  §6.6): seller-grouped line items, quantity updates, remove, subtotal,
+  mounted once in the storefront header with a live item-count badge.
+- **PDP Add to cart / Buy now, finally wired** (`App\Livewire\Storefront\
+  AddToCartForm`): variant picker, quantity, both CTAs call the same
+  `CartService` the API has used since Run 1.5. `AddToCartForm` and
+  `CartDrawer` stay in sync via a dispatched `cart-updated` browser event
+  — no full page reload needed to see the cart update.
+- **Checkout** (`App\Http\Controllers\Storefront\CheckoutController`,
+  Design System §6.6 "dedicated page, not modal"): address (saved
+  addresses as selectable cards, or a new one — guest checkout fully
+  supported, TDD §5.9) → delivery (per-seller zone/method, see below) →
+  payment-and-review (collapsed into one page rather than two — flagged
+  inline in the controller) → confirmation. Every step is a thin
+  presentation over `CheckoutService`/`ShippingService` — the exact
+  services `tests/Feature/Commerce/CheckoutFlowTest.php` already
+  exercises at the API layer; no checkout business logic is duplicated.
+- **Delivery fee is now computed from real `delivery_rate_cards`**
+  (Run 1.6's own schema), not a self-reported number — Run 1.5's
+  CHANGELOG flagged this exact gap ("doesn't compute a fee from zones or
+  weight"). The buyer picks a rate card; its seller is re-verified
+  against the cart's own seller grouping server-side, so a tampered
+  request can't borrow another seller's cheaper rate (tested).
+- **Three real bugs found and fixed while building this**, each
+  previously-shipped code that was never actually wired end to end:
+  - `CheckoutService::confirmOrder()`/`markPaymentFailed()` existed
+    since Run 1.5 but nothing called them — a `checkout_sessions` row
+    stayed stuck at `payment_processing` forever, even after its order
+    was confirmed by the payment webhook. `AbstractPaymentGateway::
+    applyWebhookResult()` now calls the right one.
+  - `CartService::mergeIntoUserCart()` existed since Run 1.5 but nothing
+    called it — a guest who shopped, then signed in, silently lost their
+    cart. `App\Listeners\MergeGuestCartOnLogin` now does it, paired with
+    `StashSessionIdBeforeLogin` (Laravel's `SessionGuard::login()`
+    regenerates the session id *before* firing the `Login` event the
+    merge listener needs — the stash listener runs on the earlier
+    `Attempting` event, before that regeneration, and carries the
+    pre-login session id across it via the session's own data, which
+    `migrate()` preserves under the new id).
+  - Pesepay/Paynow's `return_url` was configured but pointed nowhere —
+    `AbstractPaymentGateway::defaultReturnUrl()` now falls back to this
+    app's own `/checkout/return`, which looks up the buyer's own
+    checkout session and routes them to confirmation or the failed page
+    based on its (now-correctly-updated) status.
+- **`addresses.user_id` made nullable** (expand-pattern migration) — it
+  was `NOT NULL` since Run 1.3, which silently made guest checkout
+  impossible to actually use once a real UI tried to save a guest's
+  address (API-only testing never caught this, since those tests always
+  used a pre-existing authenticated user's address).
+- **Post-purchase account upsell** (Design System §6.6: "one field —
+  just set a password — never a pre-purchase gate"): on the confirmation
+  page, a guest can create an account from their order's own
+  `guest_email`, which signs them in and attaches the order to the new
+  account.
+- **"Ask about this product" wired** (flagged deferred since Run 1.4):
+  the PDP link now opens the AI assistant (Run 1.8) pre-grounded in that
+  product's context, shown as a context chip per Design System §7.2 —
+  `AssistantService::startConversation()` already accepted
+  `context_type`/`context_id`, just never had a caller.
+- Feature tests: `tests/Feature/Storefront/CheckoutUiTest.php` (add to
+  cart updates the drawer; a guest completes checkout through the
+  website to a webhook-confirmed order and a working return-redirect to
+  confirmation; a failed payment lands on the dedicated failed page; a
+  tampered delivery selection is rejected; a guest creates an account
+  from the confirmation page) and `tests/Feature/Storefront/
+  CartMergeOnLoginTest.php`.
+
+### Deferred / flagged (still open after this pass)
+
+Everything below was already flagged in an earlier run's CHANGELOG
+entry and is still genuinely open — this pass closed the highest-value
+engineering gaps, not every gap:
+
+- MFA enforcement for seller/admin (TDD §8.2, flagged since Run 1.7).
+- Audit-log filtering (flagged since Run 1.7).
+- Web product-creation form, seller/shipper self-service "become a X"
+  web forms (flagged since Run 1.7) — both fully functional via the API.
+- Product-image pipeline and everything that depends on it: PDP image
+  gallery, categorisation/attribute-extraction AI suggestions (flagged
+  since Runs 1.2/1.4/1.8/1.11).
+- Reviews, wishlists, recommendations, sponsored placements, the search-
+  as-you-type dropdown and dual-handle price slider, analytics-dependent
+  features (sales summaries, performance insights, views/conversion
+  figures) — each still needs a module this build hasn't reached.
+- Checkout's 4-step spec collapsed to 3 pages (review merged into
+  payment) — a deliberate simplification this run, not an oversight.
+- `order_group` delivered→completed collapse, weight/distance-banded
+  delivery pricing, shipper KYC (flagged since Run 1.6).
+- `AddToCartForm`'s variant picker has no live-stock recheck between
+  page load and the add-to-cart click — `CartService::addItem()` still
+  re-validates product status server-side, but a variant that sells out
+  in that window shows a generic rejection rather than a live-updated
+  "out of stock" state.
+
 ## Run 1.11 — AI platform v2
 
 Scope: TDD §14, stage 1.11 — seller/admin AI tools (§5.6), an AI

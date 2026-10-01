@@ -43,6 +43,14 @@ return [
         'encryption_key' => env('PESEPAY_ENCRYPTION_KEY'),
         'base_url' => env('PESEPAY_BASE_URL', 'https://api.pesepay.com/api/payments-engine/v1'),
         'result_url' => env('PESEPAY_RESULT_URL'),
+        // Run 1.12: when unset, each Gateway's initiate() falls back to
+        // this app's own checkout-return route at call time (url()
+        // isn't safe to call while config/ files are being loaded —
+        // there's no bound Request yet in every context, e.g. artisan
+        // commands) — see App\Services\Payments\AbstractPaymentGateway::
+        // defaultReturnUrl(). Previously this was unset with no
+        // fallback at all, so a buyer sent back from the gateway had
+        // nowhere on this site to land.
         'return_url' => env('PESEPAY_RETURN_URL'),
     ],
 

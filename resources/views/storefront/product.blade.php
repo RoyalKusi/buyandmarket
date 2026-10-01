@@ -3,10 +3,8 @@
         Design System §6.4 (PDP). Omitted here (flagged in CHANGELOG.md,
         Run 1.4): the real image gallery (module 5.8, Run 1.9), rating
         row and reviews tab content (module 33), related/recently-viewed
-        rails (module 40), the AI "Ask about this product" entry point
-        (Run 1.8), and working Add to cart / Buy now (Run 1.5) — both
-        CTAs render per spec but are disabled with an explanatory label,
-        never silently inert.
+        rails (module 40). Add to cart / Buy now (Run 1.12) and the AI
+        "Ask about this product" entry point (Run 1.12) are wired.
     --}}
     <div class="mx-auto max-w-[1280px] px-4 md:px-6 py-8">
         <x-breadcrumbs :items="$breadcrumbs" />
@@ -25,34 +23,23 @@
 
                 <p class="mt-4 text-price-lg text-blue-600">${{ number_format((float) $product->base_price, 2) }}</p>
 
-                @if ($product->variants->isNotEmpty())
-                    <div class="mt-6">
-                        <p class="text-body-md text-slate-700 mb-2">Options</p>
-                        <div class="flex flex-wrap gap-2">
-                            @foreach ($product->variants as $variant)
-                                <span class="h-10 px-4 rounded-full border border-slate-200 flex items-center text-body-sm text-slate-700">
-                                    {{ $variant->sku }}
-                                    @if ($variant->stock_quantity < 1)
-                                        <span class="ml-2 text-danger-600">(out of stock)</span>
-                                    @endif
-                                </span>
-                            @endforeach
-                        </div>
-                    </div>
-                @endif
-
                 <p class="mt-4 text-body-sm text-slate-600">
                     {{ $product->stock_quantity > 0 ? "{$product->stock_quantity} in stock" : 'Out of stock' }}
                 </p>
 
-                <div class="mt-6 flex flex-col gap-2">
-                    <button type="button" disabled class="h-12 rounded-sm border border-slate-200 text-slate-400 text-button cursor-not-allowed" title="Cart is not available yet">
-                        Add to cart
-                    </button>
-                    <button type="button" disabled class="h-12 rounded-sm bg-slate-200 text-slate-400 text-button cursor-not-allowed" title="Checkout is not available yet">
-                        Buy now
-                    </button>
-                </div>
+                {{-- Variant options are the interactive picker inside
+                     this component (duplicating a static list above it
+                     would just be confusing). --}}
+                <livewire:storefront.add-to-cart-form :product="$product" />
+
+                {{-- Design System §6.4 "Ask about this product" AI entry
+                     point (TDD §7.1), pre-seeded with this product's
+                     context (App\Services\Ai\AssistantService already
+                     accepts context_type/context_id, wired end to end
+                     here for the first time). --}}
+                <a href="{{ route('dashboard.assistant', ['product' => $product->id]) }}" class="mt-3 block text-center text-body-sm text-blue-600 hover:underline">
+                    Ask BM Assistant about this product
+                </a>
             </div>
         </div>
 

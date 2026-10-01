@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Models\Conversation;
+use App\Models\Product;
 use App\Services\Ai\AssistantService;
 use Livewire\Component;
 
@@ -21,10 +22,32 @@ class AiAssistant extends Component
 
     public string $draft = '';
 
-    public function mount(): void
+    public ?string $contextLabel = null;
+
+    /**
+     * Design System §7.2: "a one-line context chip when grounded" — a
+     * tap from PDP's "Ask about this product" (App\Http\Controllers\
+     * Storefront\ProductController's own link) always opens a fresh
+     * conversation pre-grounded in that product, rather than continuing
+     * whatever the buyer was asking about before.
+     */
+    public function mount(?int $product = null): void
     {
-        $conversation = auth()->user()->conversations()->latest()->first()
-            ?? app(AssistantService::class)->startConversation(auth()->user(), null);
+        if ($product !== null) {
+            $productModel = Product::find($product);
+
+            $conversation = app(AssistantService::class)->startConversation(
+                auth()->user(),
+                null,
+                'product',
+                $product,
+            );
+
+            $this->contextLabel = $productModel !== null ? "Discussing: {$productModel->title}" : null;
+        } else {
+            $conversation = auth()->user()->conversations()->latest()->first()
+                ?? app(AssistantService::class)->startConversation(auth()->user(), null);
+        }
 
         $this->conversationId = $conversation->id;
     }

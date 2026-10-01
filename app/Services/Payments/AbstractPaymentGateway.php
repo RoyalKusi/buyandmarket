@@ -3,8 +3,10 @@
 namespace App\Services\Payments;
 
 use App\Contracts\PaymentGateway;
+use App\Models\CheckoutSession;
 use App\Models\Order;
 use App\Models\Payment;
+use App\Services\CheckoutService;
 use App\Services\OrderService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -19,7 +21,23 @@ abstract class AbstractPaymentGateway implements PaymentGateway
 {
     abstract protected function providerName(): string;
 
-    public function __construct(protected readonly OrderService $orderService) {}
+    public function __construct(
+        protected readonly OrderService $orderService,
+        protected readonly CheckoutService $checkoutService,
+    ) {}
+
+    /**
+     * TDD §7.4 `return_url`: falls back to this app's own checkout-return
+     * route (App\Http\Controllers\Storefront\CheckoutController::return())
+     * when unconfigured — computed at call time (inside initiate(), always
+     * within a real HTTP request) rather than in config/services.php,
+     * where url() has no bound Request to resolve the host from in every
+     * context (e.g. artisan commands).
+     */
+    protected function defaultReturnUrl(): string
+    {
+        return url('/checkout/return');
+    }
 
     protected function recordInitiatedPayment(Order $order, string $providerReference): Payment
     {
@@ -60,8 +78,21 @@ abstract class AbstractPaymentGateway implements PaymentGateway
 
             $payment->update(['status' => $status, 'raw_payload' => $rawPayload]);
 
+            // Run 1.12 fix: CheckoutService::confirmOrder()/markPaymentFailed()
+            // existed since Run 1.5 but nothing ever called them — a
+            // checkout_sessions row stayed stuck at 'payment_processing'
+            // forever, even after its order was confirmed. The storefront
+            // checkout UI's return/failed pages depend on this being correct.
+            $session = CheckoutSession::where('order_id', $payment->order_id)->first();
+
             if ($status === 'succeeded') {
                 $this->orderService->confirmPaidOrder($payment->order);
+
+                if ($session !== null) {
+                    $this->checkoutService->confirmOrder($session);
+                }
+            } elseif ($status === 'failed' && $session !== null) {
+                $this->checkoutService->markPaymentFailed($session);
             }
         });
     }

@@ -5,10 +5,15 @@ namespace App\Providers;
 use App\Contracts\Ai\EmbeddingProvider;
 use App\Contracts\Ai\LlmProvider;
 use App\Contracts\SearchProvider;
+use App\Listeners\MergeGuestCartOnLogin;
+use App\Listeners\StashSessionIdBeforeLogin;
 use App\Models\User;
 use App\Services\Ai\OpenAiCompatibleEmbeddingProvider;
 use App\Services\Ai\OpenAiCompatibleLlmProvider;
 use App\Services\Search\EloquentSearchProvider;
+use Illuminate\Auth\Events\Attempting;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -41,6 +46,11 @@ class AppServiceProvider extends ServiceProvider
         // special-case it. Sub-admins are never covered here: their access
         // stays scoped to the admin_roles permission set on their assignment.
         Gate::before(fn (User $user, string $ability) => $user->hasRole('admin') ? true : null);
+
+        // TDD §3.4 module 17: "merged on login" (Run 1.12 fix — see
+        // App\Listeners\MergeGuestCartOnLogin's own doc comment).
+        Event::listen(Attempting::class, StashSessionIdBeforeLogin::class);
+        Event::listen(Login::class, MergeGuestCartOnLogin::class);
 
         // TDD §8.2: minimum 10 characters, breached-password check via a
         // k-anonymity API (HaveIBeenPwned range query) at registration/reset.

@@ -206,4 +206,24 @@ class AssistantTest extends TestCase
 
         $this->actingAs($buyer)->get('/dashboard/assistant')->assertOk()->assertSee('Ask BM Assistant');
     }
+
+    /**
+     * Run 1.12: PDP's "Ask about this product" link was flagged deferred
+     * since Run 1.4 — it's wired now, pre-grounding a fresh conversation
+     * in the product's context rather than continuing whatever the buyer
+     * was previously asking about.
+     */
+    public function test_asking_about_a_product_from_the_pdp_starts_a_grounded_conversation(): void
+    {
+        $product = $this->publishedProduct();
+        $buyer = User::factory()->withRole('buyer')->create();
+
+        $this->actingAs($buyer)->get("/dashboard/assistant?product={$product->id}")
+            ->assertOk()
+            ->assertSee("Discussing: {$product->title}");
+
+        $conversation = $buyer->conversations()->firstOrFail();
+        $this->assertSame('product', $conversation->context_type);
+        $this->assertSame($product->id, $conversation->context_id);
+    }
 }

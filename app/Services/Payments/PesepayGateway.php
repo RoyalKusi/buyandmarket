@@ -43,7 +43,7 @@ class PesepayGateway extends AbstractPaymentGateway
             ],
             'reasonForPayment' => "BuyAndMarket order {$order->order_number}",
             'resultUrl' => config('services.pesepay.result_url'),
-            'returnUrl' => config('services.pesepay.return_url'),
+            'returnUrl' => config('services.pesepay.return_url') ?: $this->defaultReturnUrl(),
             'merchantReference' => $reference,
         ];
 
