@@ -15,6 +15,9 @@ use Illuminate\Auth\Events\Attempting;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
+use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Auth\Notifications\VerifyEmail;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -62,6 +65,24 @@ class AppServiceProvider extends ServiceProvider
         // check, but never actually sends the first verification email
         // on registration.
         Event::listen(Registered::class, SendEmailVerificationNotification::class);
+
+        // Brand-styled account emails: Laravel's own VerifyEmail/
+        // ResetPassword notifications render through the default
+        // Markdown notification theme (generic Laravel green) unless
+        // overridden here — same branded shell (App\'s resources/views/
+        // components/emails/layout.blade.php) as every transactional
+        // email NotificationMailer sends, so every email this app ever
+        // sends looks like it came from the same product.
+        VerifyEmail::toMailUsing(fn ($notifiable, string $url) => (new MailMessage)
+            ->subject('Verify your email address')
+            ->view('emails.auth.verify-email', ['url' => $url]));
+
+        ResetPassword::toMailUsing(fn ($notifiable, string $token) => (new MailMessage)
+            ->subject('Reset your password')
+            ->view('emails.auth.reset-password', [
+                'url' => url(route('password.reset', ['token' => $token, 'email' => $notifiable->getEmailForPasswordReset()], false)),
+                'expireMinutes' => (int) config('auth.passwords.'.config('auth.defaults.passwords').'.expire'),
+            ]));
 
         // TDD §8.2: minimum 10 characters, breached-password check via a
         // k-anonymity API (HaveIBeenPwned range query) at registration/reset.

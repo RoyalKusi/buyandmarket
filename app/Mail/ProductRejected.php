@@ -27,7 +27,7 @@ class ProductRejected extends Mailable
     public function content(): Content
     {
         return new Content(
-            markdown: 'emails.products.rejected',
+            html: 'emails.products.rejected',
             with: [
                 'product' => $this->product,
                 'reasonCode' => $this->reasonCode,

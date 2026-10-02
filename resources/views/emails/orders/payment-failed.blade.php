@@ -1,24 +1,31 @@
-<x-mail::message>
-# Payment didn't go through
+<x-emails.layout :preheader="'Payment for order ' . $order->order_number . ' did not go through — nothing was charged'">
+    <x-emails.badge tone="danger">Payment not completed</x-emails.badge>
 
-@if ($recipientName)
-Hi {{ $recipientName }},
-@else
-Hi there,
-@endif
+    <h1 style="margin:0 0 12px; font-family:'Space Grotesk', Arial, Helvetica, sans-serif; font-size:24px; line-height:30px; font-weight:700; letter-spacing:-0.01em; color:#131926;">
+        Payment didn't go through
+    </h1>
 
-We weren't able to process payment for order **{{ $order->order_number }}** (${{ number_format((float) $order->total, 2) }}). Nothing has been charged, and your items are still saved — you can pick up right where you left off.
+    <p style="margin:0 0 4px; font-family:'Inter', Arial, Helvetica, sans-serif; font-size:15px; line-height:24px; color:#363F52;">
+        @if ($recipientName)
+            Hi {{ $recipientName }},
+        @else
+            Hi there,
+        @endif
+    </p>
 
-@if ($order->user)
-<x-mail::button :url="route('dashboard')">
-Review your order
-</x-mail::button>
-@else
-Return to BuyAndMarket and try checking out again to complete your purchase.
-@endif
+    <p style="margin:0 0 24px; font-family:'Inter', Arial, Helvetica, sans-serif; font-size:15px; line-height:24px; color:#363F52;">
+        We weren't able to process payment for order <strong style="color:#131926;">{{ $order->order_number }}</strong> (${{ number_format((float) $order->total, 2) }}). Nothing has been charged, and your items are still saved — you can pick up right where you left off.
+    </p>
 
-If you keep running into trouble, reply to this email and we'll help sort it out.
+    @if ($order->user)
+        <x-emails.button :url="route('dashboard')">Review your order</x-emails.button>
+    @else
+        <p style="margin:0 0 24px; font-family:'Inter', Arial, Helvetica, sans-serif; font-size:15px; line-height:24px; color:#363F52;">
+            Return to {{ config('app.name') }} and try checking out again to complete your purchase.
+        </p>
+    @endif
 
-Thanks,<br>
-{{ config('app.name') }}
-</x-mail::message>
+    <p style="margin:0; font-family:'Inter', Arial, Helvetica, sans-serif; font-size:14px; line-height:22px; color:#66718A;">
+        If you keep running into trouble, reply to this email and we'll help sort it out.
+    </p>
+</x-emails.layout>

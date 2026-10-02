@@ -27,7 +27,7 @@ class SellerKycRejected extends Mailable
     public function content(): Content
     {
         return new Content(
-            markdown: 'emails.sellers.kyc-rejected',
+            html: 'emails.sellers.kyc-rejected',
             with: [
                 'seller' => $this->seller,
                 'reasonCode' => $this->reasonCode,

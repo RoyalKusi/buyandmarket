@@ -23,7 +23,7 @@ class ProductApproved extends Mailable
     public function content(): Content
     {
         return new Content(
-            markdown: 'emails.products.approved',
+            html: 'emails.products.approved',
             with: ['product' => $this->product],
         );
     }

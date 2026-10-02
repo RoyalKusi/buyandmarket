@@ -31,7 +31,7 @@ class PaymentFailed extends Mailable
     public function content(): Content
     {
         return new Content(
-            markdown: 'emails.orders.payment-failed',
+            html: 'emails.orders.payment-failed',
             with: [
                 'order' => $this->order,
                 'recipientName' => $this->order->user?->name,

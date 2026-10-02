@@ -3,6 +3,70 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Branded HTML email templates
+
+Scope: user feedback — "The emails should have very beautiful, well
+designed templates reflective of the brand." Every outbound app email
+previously rendered through Laravel's generic default Markdown mail
+theme (the stock green `<x-mail::message>` look), unrelated to the
+Design System's actual brand (§1.5: Royal Blue `#003594` primary,
+Marketplace Gold `#FFB81C` accent, Space Grotesk/Inter type, 12px/8px
+radius scale). This replaces it with a real branded HTML email system.
+
+### Added
+
+- **`resources/views/components/emails/layout.blade.php`**: a
+  table-based, inline-styled HTML email shell (not Markdown) — the
+  single layout every app email now renders through. Royal Blue header
+  band with the `Buy`**And**(gold)`Market` wordmark, white content
+  card, slate footer, hidden preheader text, and standard Outlook/
+  Windows-Mail compatibility fixes (MSO conditional comments, px-based
+  table widths, a mobile `@media` stack rule) — no Markdown-to-HTML
+  pipeline, since granular inline control is what email clients
+  actually require.
+- **`emails.button`** and **`emails.badge`** components: a bulletproof
+  table-based button (Outlook ignores padding on a plain `<a>`, so a
+  `<table><td>` wrapper is used instead) always in brand blue per
+  §1.5's "gold never for primary CTAs" rule, and a small status pill
+  (green/red) for approved/rejected states.
+- **`emails.order-items`**: a proper line-item table (was a Markdown
+  pipe-table before) with subtotal/delivery/total breakdown, used by
+  the order-confirmation email.
+- All six existing transactional templates (`OrderConfirmed`,
+  `PaymentFailed`, `SellerKycApproved`, `SellerKycRejected`,
+  `ProductApproved`, `ProductRejected`) rewritten against this layout;
+  each Mailable's `content()` switched from `markdown:` to `html:`
+  accordingly. Same data, same wording, same call sites — only the
+  rendering changed.
+- **Laravel's own account emails rebranded too**: `VerifyEmail` and
+  `ResetPassword` (Fortify's built-in notifications) previously
+  rendered through Laravel's *other* generic default — the Markdown
+  notification theme, not even using this app's own default. Both are
+  now rebuilt via their `toMailUsing()` static hooks
+  (`AppServiceProvider::boot()`) to render through the same branded
+  layout and new `emails.auth.verify-email`/`emails.auth.reset-password`
+  views, so every email a user ever receives from this app — a
+  verification link, a password reset, an order receipt — looks like
+  it came from the same product.
+
+### Verified against acceptance criteria
+
+- Full suite: 189 passed (615 assertions), up from 187 — 2 new tests
+  render the rebranded `VerifyEmail`/`ResetPassword` notifications for
+  real (`Mail::fake()`, used everywhere notifications are normally
+  tested, intercepts dispatch before rendering and would never catch a
+  template error here — same lesson `NotificationMailerTest`'s own
+  render-everything test already documents). All 6 transactional
+  templates' existing render test still passes unmodified against the
+  new markup.
+- Rendered all 6 transactional templates plus both account-email
+  templates to static HTML and screenshotted them with a headless
+  Chromium to visually confirm the brand (colors, wordmark, spacing,
+  button/badge rendering) actually reads correctly, not just that the
+  Blade compiles.
+- Pint clean. No migration, no frontend asset touched — `migrate:fresh`
+  and `npm run build` both unaffected by this change.
+
 ## Email verification + payment gateway connectivity diagnostic
 
 Scope: closes Production Readiness Report conditions #2 ("verify

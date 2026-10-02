@@ -23,7 +23,7 @@ class SellerKycApproved extends Mailable
     public function content(): Content
     {
         return new Content(
-            markdown: 'emails.sellers.kyc-approved',
+            html: 'emails.sellers.kyc-approved',
             with: ['seller' => $this->seller],
         );
     }
