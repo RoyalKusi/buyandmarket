@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Dashboard;
 use App\Http\Controllers\Controller;
 use App\Models\Address;
 use App\Models\Order;
+use App\Models\Product;
+use App\Services\WishlistService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -66,5 +68,19 @@ class BuyerController extends Controller
         $address->delete();
 
         return back()->with('status', 'Address removed.');
+    }
+
+    public function wishlist(Request $request): View
+    {
+        return view('dashboard.buyer.wishlist', [
+            'items' => $request->user()->wishlistItems()->with('product.store', 'product.images')->latest()->paginate(15),
+        ]);
+    }
+
+    public function removeFromWishlist(Request $request, Product $product, WishlistService $wishlistService): RedirectResponse
+    {
+        $wishlistService->toggle($request->user(), $product);
+
+        return back()->with('status', 'Removed from wishlist.');
     }
 }

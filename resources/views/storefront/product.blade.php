@@ -61,6 +61,14 @@
                      would just be confusing). --}}
                 <livewire:storefront.add-to-cart-form :product="$product" />
 
+                @auth
+                    <div class="mt-3">
+                        <livewire:storefront.wishlist-button :product="$product" />
+                    </div>
+                @else
+                    <a href="{{ route('login') }}" class="mt-3 block text-body-sm text-slate-600 hover:text-blue-600">Sign in to save to your wishlist</a>
+                @endauth
+
                 {{-- Design System §6.4 "Ask about this product" AI entry
                      point (TDD §7.1), pre-seeded with this product's
                      context (App\Services\Ai\AssistantService already

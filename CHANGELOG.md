@@ -3,6 +3,44 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Run 1.18 — Wishlists
+
+Scope: continuing the deferred-item pass. Flagged since Run 1.4's
+CHANGELOG alongside cart ("cart and wishlist have no backing module
+until Run 1.5/§3.5") — cart shipped in Run 1.5, wishlist was the one
+half of that pair still missing.
+
+### Added
+
+- **`wishlist_items` table + `App\Models\WishlistItem`**: a plain
+  per-user toggle, unique on `(user_id, product_id)` — no separate
+  named lists, since nothing in the TDD names a multiple-wishlist
+  feature.
+- **`App\Services\WishlistService`**: `toggle()`/`contains()`.
+- **PDP**: a heart-icon toggle (`App\Livewire\Storefront\
+  WishlistButton`) next to Add to cart, for signed-in buyers; a guest
+  sees a "Sign in to save to your wishlist" link instead (wishlisting
+  is tied to an account, not a guest session, unlike the cart).
+- **`/dashboard/wishlist`**: grid of saved products with a remove
+  action, linked from the buyer sidebar.
+
+### Verified against acceptance criteria
+
+- Full suite: 126 passed (439 assertions) — new coverage: toggle on/off
+  via the Livewire component, the dashboard page lists and removes
+  items, and a guest sees the sign-in prompt instead of the button.
+- Pint: clean. `migrate:fresh`: clean. Production build: 38.86KB
+  gzipped JS, unchanged — Livewire ships once already, this is one more
+  small component.
+
+### Deferred / flagged (still open)
+
+- No "notify me when back in stock" or price-drop alerts on wishlisted
+  items — not named in the TDD, flagged as a natural follow-up rather
+  than silently added.
+- Recommendations, sponsored placements, analytics-dependent seller
+  insights — unchanged from Run 1.14's list.
+
 ## Run 1.17 — Reviews + Top Rated seller badge
 
 Scope: continuing the deferred-item pass. TDD module 33 (reviews),

@@ -104,6 +104,14 @@ class User extends Authenticatable
         return $this->hasMany(Conversation::class);
     }
 
+    /**
+     * @return HasMany<WishlistItem, $this>
+     */
+    public function wishlistItems(): HasMany
+    {
+        return $this->hasMany(WishlistItem::class);
+    }
+
     protected static function booted(): void
     {
         // TDD §6.2: "phone or email required, not both nullable."

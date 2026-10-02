@@ -57,6 +57,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard/addresses', [BuyerController::class, 'addresses'])->name('dashboard.addresses');
     Route::post('/dashboard/addresses', [BuyerController::class, 'storeAddress'])->name('dashboard.addresses.store');
     Route::delete('/dashboard/addresses/{address}', [BuyerController::class, 'destroyAddress'])->name('dashboard.addresses.destroy');
+    Route::get('/dashboard/wishlist', [BuyerController::class, 'wishlist'])->name('dashboard.wishlist');
+    Route::delete('/dashboard/wishlist/{product}', [BuyerController::class, 'removeFromWishlist'])->name('dashboard.wishlist.destroy');
     Route::view('/dashboard/assistant', 'dashboard.assistant')->name('dashboard.assistant');
 
     // TDD §8.2: "MFA required for seller ... and all admin/sub-admin
