@@ -150,5 +150,27 @@
             <h2 class="text-heading-md text-slate-900 mb-3">Seller information</h2>
             <x-store-card :store="$product->store" />
         </div>
+
+        @if ($relatedProducts->isNotEmpty())
+            <div class="mt-8 border-t border-slate-100 pt-8">
+                <h2 class="text-heading-md text-slate-900 mb-4">You might also like</h2>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    @foreach ($relatedProducts as $related)
+                        <x-product-tile :product="$related" />
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
+        @if ($recentlyViewed->isNotEmpty())
+            <div class="mt-8 border-t border-slate-100 pt-8">
+                <h2 class="text-heading-md text-slate-900 mb-4">Recently viewed</h2>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    @foreach ($recentlyViewed as $viewed)
+                        <x-product-tile :product="$viewed" />
+                    @endforeach
+                </div>
+            </div>
+        @endif
     </div>
 </x-layouts.storefront>

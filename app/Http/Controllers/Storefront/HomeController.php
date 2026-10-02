@@ -5,18 +5,23 @@ namespace App\Http\Controllers\Storefront;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Store;
+use App\Services\RecentlyViewedService;
+use App\Services\RecommendationService;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 /**
  * Design System §6.1. Sections requiring a module this build hasn't
  * reached yet are omitted rather than faked — see CHANGELOG.md, Run 1.4,
  * for the full list (hero carousel content, "Deals near you"
- * geolocation-ranked rail, AI-curated "Picked for you", sponsored
- * placement block, trust strip).
+ * geolocation-ranked rail, sponsored placement block, trust strip).
+ * "Picked for you" and "Recently viewed" (module 40) are wired as of
+ * Run 1.19 — deterministic, not AI-curated (see
+ * App\Services\RecommendationService's own docblock for why).
  */
 class HomeController extends Controller
 {
-    public function index(): View
+    public function index(RecommendationService $recommendationService, RecentlyViewedService $recentlyViewedService): View
     {
         return view('storefront.home', [
             'categories' => Category::query()->whereNull('parent_id')->orderBy('name')->limit(12)->get(),
@@ -26,6 +31,8 @@ class HomeController extends Controller
                 ->orderByDesc('products_count')
                 ->limit(8)
                 ->get(),
+            'pickedForYou' => $recommendationService->pickedFor(Auth::user()),
+            'recentlyViewed' => $recentlyViewedService->recentlyViewed(),
         ]);
     }
 }

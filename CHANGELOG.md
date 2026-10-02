@@ -3,6 +3,49 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Run 1.19 — Recommendations: related, recently-viewed, picked-for-you
+
+Scope: continuing the deferred-item pass. TDD §6.1/module 40's three
+rails, flagged deferred since Run 1.4 for lacking view-tracking data
+and, for "Picked for you," an AI/RAG module to curate it.
+
+### Added
+
+- **`App\Services\RecommendationService`**: `relatedTo()` (same
+  category, published, excludes the current product) and `pickedFor()`
+  (category affinity from the buyer's own confirmed/completed order
+  history, excluding what they've already bought; a guest or a buyer
+  with no order history yet gets the newest published listings instead
+  of an empty rail). Both deterministic — same reasoning already applied
+  to the seller dashboard's pricing insights and low-stock alerts: a
+  recommendation a buyer can trust the reasoning behind beats an LLM
+  narrating a guess it can't ground in real signal.
+- **`App\Services\RecentlyViewedService`**: session-based (works
+  identically for a guest or a signed-in buyer, same guest-first posture
+  the cart already takes) — no persisted view-event table, since no
+  analytics event stream exists yet (flagged since Run 1.11).
+- **PDP**: "You might also like" (related) and "Recently viewed" rails.
+- **Homepage**: "Recently viewed" and "Picked for you" sections.
+
+### Verified against acceptance criteria
+
+- Full suite: 130 passed (450 assertions) — new coverage: related
+  products stay within category, recently-viewed populates across two
+  page visits, picked-for-you surfaces the buyer's purchased category
+  while excluding the already-bought product, and a guest falls back to
+  the newest listings.
+- Pint: clean. `migrate:fresh`: clean (no new migration this run).
+  Production build: 38.86KB gzipped JS, unchanged.
+
+### Deferred / flagged (still open)
+
+- "Deals near you" (geolocation ranking), the hero carousel, sponsored
+  placements, trust strip — unchanged, still blocked on modules this
+  build hasn't reached.
+- No event-stream-backed recently-viewed across devices/sessions — this
+  is one browser session's memory only, by design (see
+  `RecentlyViewedService`'s own docblock).
+
 ## Run 1.18 — Wishlists
 
 Scope: continuing the deferred-item pass. Flagged since Run 1.4's

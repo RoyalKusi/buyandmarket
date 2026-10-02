@@ -1,13 +1,24 @@
 <x-layouts.storefront title="BuyAndMarket — Zimbabwe's multi-vendor marketplace">
     {{--
-        Design System §6.1 homepage order. Omitted this run (flagged in
+        Design System §6.1 homepage order. Omitted (flagged in
         CHANGELOG.md): hero carousel (needs curated campaign-banner
-        content), "Deals near you" (geolocation ranking), AI-curated
-        "Picked for you", sponsored placement block, trust strip. What
-        ships — category quick-links, featured stores, category grid — is
-        every section this run's data model can back honestly.
+        content), "Deals near you" (geolocation ranking), sponsored
+        placement block, trust strip. "Picked for you" and "Recently
+        viewed" (module 40, Run 1.19) are wired below, deterministically
+        — see App\Services\RecommendationService.
     --}}
     <div class="mx-auto max-w-[1280px] px-4 md:px-6 py-8 space-y-12">
+        @if ($recentlyViewed->isNotEmpty())
+            <section aria-labelledby="recently-viewed-heading">
+                <h2 id="recently-viewed-heading" class="text-heading-lg text-slate-900 mb-4">Recently viewed</h2>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    @foreach ($recentlyViewed as $product)
+                        <x-product-tile :product="$product" />
+                    @endforeach
+                </div>
+            </section>
+        @endif
+
         <section aria-labelledby="categories-heading">
             <h2 id="categories-heading" class="text-heading-lg text-slate-900 mb-4">Shop by category</h2>
 
@@ -43,5 +54,16 @@
                 </div>
             @endif
         </section>
+
+        @if ($pickedForYou->isNotEmpty())
+            <section aria-labelledby="picked-for-you-heading">
+                <h2 id="picked-for-you-heading" class="text-heading-lg text-slate-900 mb-4">Picked for you</h2>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    @foreach ($pickedForYou as $product)
+                        <x-product-tile :product="$product" />
+                    @endforeach
+                </div>
+            </section>
+        @endif
     </div>
 </x-layouts.storefront>
