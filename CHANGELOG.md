@@ -3,6 +3,55 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## CI: fixed the Tests (PHP 8.3) job — lockfile silently required PHP 8.4
+
+Scope: the previous fix round's own push turned up a third, independent
+CI failure — `Tests (PHP 8.3)` failed at `composer install` itself
+("Your lock file does not contain a compatible set of packages"),
+confirmed pre-existing (identical failure on the prior commit, before
+any of this round's changes).
+
+### Root cause
+
+`composer.json` declares `"php": "^8.2"`, and CI's matrix tests both
+PHP 8.3 and 8.4 — but `composer.lock` had `web-auth/webauthn-lib`
+(pulled in transitively by `laravel/passkeys`) locked to a version
+whose `symfony/*` dependencies (`clock`, `css-selector`,
+`event-dispatcher`, `serializer`, `string`, `translation`, `yaml`,
+etc., all on the 8.1.x line) require PHP ≥8.4.1. The lockfile was
+evidently last regenerated on a PHP 8.4 machine — composer resolves
+against whatever PHP is actually running unless told otherwise, so it
+silently picked versions the declared `^8.2` floor (and CI's own 8.3
+leg) can't actually install.
+
+### Fixed
+
+- Added `config.platform.php` to `composer.json`, pinning dependency
+  *resolution* (not the runtime requirement) to the floor this project
+  actually needs to support — `8.3.0` once `laravel/pint` v1.32.1's own
+  `^8.3.0` requirement surfaced during re-resolution, confirming `^8.2`
+  was already aspirational before this change, not just the webauthn
+  chain. `composer.json`'s own `require.php` updated to match (`^8.3`).
+- `composer update web-auth/webauthn-lib tijsverkoyen/css-to-inline-styles symfony/*`
+  with the pin in place: resolved to the `symfony/*` 7.4.x line
+  (PHP 8.3-compatible) across the board. Nothing else moved —
+  `laravel/framework`, `livewire/livewire`, `laravel/fortify`,
+  `laravel/sanctum`, `laravel/pint`, and `larastan/larastan` are all
+  unchanged versions; the diff is confined to the symfony/webauthn
+  dependency subtree plus two harmless transitive patch bumps
+  (`doctrine/lexer`, `phpdocumentor/type-resolver`).
+
+### Verified
+
+- `composer validate`: lockfile in sync with composer.json.
+- Full suite: 189/189, unaffected by the dependency change.
+- Pint and `vendor/bin/phpstan analyse` both still clean.
+- `migrate:fresh` clean.
+- Could not literally run under a PHP 8.3 interpreter in this sandbox
+  (only 8.4 is available here) — verification is the platform-pinned
+  resolution itself succeeding, which is exactly the check `composer
+  install` performs on a real PHP 8.3 runner.
+
 ## CI: fixed a real red-test regression and cleared pre-existing Larastan debt
 
 Scope: user reported "some tests seem to be red on the PR." Two

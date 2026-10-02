@@ -6,7 +6,7 @@
     "keywords": ["buyandmarket", "marketplace", "laravel"],
     "license": "proprietary",
     "require": {
-        "php": "^8.2",
+        "php": "^8.3",
         "laravel/fortify": "^1.40",
         "laravel/framework": "^11.31",
         "laravel/sanctum": "^4.3",
@@ -71,6 +71,9 @@
         "allow-plugins": {
             "pestphp/pest-plugin": true,
             "php-http/discovery": true
+        },
+        "platform": {
+            "php": "8.3.0"
         }
     },
     "minimum-stability": "stable",
