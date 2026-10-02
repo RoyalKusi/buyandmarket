@@ -3,6 +3,99 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Production readiness audit — corrective sweeps 1 & 2
+
+Scope: a full-application audit (functionality, security, data
+integrity, concurrency, error handling, performance, deployment
+readiness) requested ahead of a production-readiness decision, followed
+by two corrective sweeps. Full findings, fixes, and remaining risks are
+in the Production Readiness Report delivered alongside this entry — this
+is the changelog-discipline summary of what actually changed in code.
+
+### Fixed — P1 (data integrity / correctness)
+
+- **Overselling race**: `OrderService::createFromCheckoutSession()`
+  only validated stock once, at checkout-session `start()` — minutes
+  earlier than actual order creation, with no row lock. A second buyer
+  (or the same buyer returning after a stock change) could reserve more
+  stock than existed. Fixed with a `lockForUpdate()` re-check inside the
+  same transaction.
+- **Abandoned orders never released stock**: `OrderService::
+  cancelUnpaidOrder()` existed but nothing ever called it. Added
+  `orders:cancel-abandoned` (hourly) and fixed a TOCTOU race in the
+  method itself (locked read + conditional update before restoring
+  stock).
+- **AI assistant double-execution**: `AssistantService::confirmAction()`
+  checked confirmation state on an in-memory object outside any lock —
+  two near-simultaneous confirms of the same pending action (e.g. a
+  double-click) could both execute a state-changing tool call. Fixed
+  with the same locked-read-and-conditional-update pattern.
+- **Payment gateway crash on network failure**: `PesepayGateway`/
+  `PaynowGateway::initiate()` let a `ConnectionException` (timeout, DNS,
+  connection refused — routine, not an edge case) propagate uncaught
+  into a raw 500 instead of TDD §6.6's "dedicated failure state, not a
+  silent crash." Both now catch it and reuse the existing graceful-
+  decline path.
+
+### Fixed — P2 (hardening / robustness)
+
+- `CartService::addItem()`/`updateQuantity()` never capped quantity
+  against real stock (HTML `min`/`max` are client-side only). The
+  financial path was already safe downstream; this closes the input-
+  hygiene gap.
+- `AssistantService::sendMessage()` had no rate limit despite every call
+  being a paid LLM/embedding request, reachable unauthenticated — a
+  direct cost-abuse vector. Fixed inside the one choke point both the
+  API route and the Livewire dashboard widget share.
+- `ProductImageService` had no maximum pixel-dimension check before GD
+  decoded an upload — a small, highly-compressed image could still
+  exhaust worker memory ("pixel flood"). Added a 40-megapixel cap
+  checked via `getimagesize()` alone, before any GD decode runs.
+- Added `App\Http\Middleware\SecurityHeaders` (X-Content-Type-Options,
+  X-Frame-Options, Referrer-Policy, Permissions-Policy) globally.
+- Added `config/cors.php` scoped to `SANCTUM_STATEFUL_DOMAINS` (was
+  implicitly wildcard-origin via Laravel's unpublished default).
+
+### Fixed — P3 (data integrity polish)
+
+- `BuyerController::storeAddress()` now unsets a buyer's previous
+  default address before setting a new one — previously multiple
+  addresses could be simultaneously marked default (a confusing display
+  bug; checkout always has the buyer pick explicitly, so never a wrong-
+  address-used-silently risk).
+
+### Verified
+
+- A dedicated authorization/IDOR sweep across every controller and
+  Livewire component (state-changing actions on route-bound models)
+  found no confirmed cross-tenant access findings.
+- Full suite: 162 passed (554 assertions), up from 144 before the audit
+  — 18 new regression tests covering every fix above. Pint clean.
+  `migrate:fresh` clean. `route:cache`/`config:cache`/`view:cache` all
+  succeed (deployment-cache-compatible). Production build unchanged at
+  38.86KB gzipped JS.
+- A live HTTP smoke test (real server, seeded data) confirmed
+  homepage/PDP/search/login/register/health all render cleanly with no
+  leaked PHP warnings/errors, security headers present on real
+  responses, and a full register → auto-login → dashboard → PDP journey
+  completes end-to-end.
+
+### Deferred / flagged (disclosed, not fixed — see Production Readiness Report)
+
+- No email/SMS notifications anywhere in the app (order confirmation,
+  shipping updates, seller moderation decisions) — already flagged in
+  earlier CHANGELOG entries, re-confirmed here as a production-blocking
+  gap, not newly discovered.
+- Refunds have schema and a `PaymentGateway::refund()` method on each
+  gateway, but no service/UI calls them yet — already flagged in Run
+  1.5's CHANGELOG, re-confirmed here.
+- No email verification enforcement (`User` doesn't implement
+  `MustVerifyEmail`) — a buyer can register with an email they don't
+  control and use the platform unverified.
+- Pesepay/Paynow field-level API shapes remain unverified against a
+  live sandbox (no network path in this environment) — already flagged
+  since Run 1.5.
+
 ## Run 1.22 — Analytics event stream + seller sales summaries/performance insights
 
 Scope: continuing the deferred-item pass — the last item on the
