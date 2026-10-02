@@ -25,7 +25,7 @@ class ConversationController extends Controller
         ]);
 
         $conversation = $assistant->startConversation(
-            $request->user(),
+            $request->user('sanctum'),
             $request->session()->getId(),
             $data['context_type'] ?? null,
             $data['context_id'] ?? null,
@@ -57,8 +57,8 @@ class ConversationController extends Controller
 
     private function authorizeConversation(Request $request, Conversation $conversation): void
     {
-        $owns = $request->user() !== null
-            ? $conversation->user_id === $request->user()->id
+        $owns = $request->user('sanctum') !== null
+            ? $conversation->user_id === $request->user('sanctum')->id
             : $conversation->session_id === $request->session()->getId();
 
         abort_unless($owns, 404);

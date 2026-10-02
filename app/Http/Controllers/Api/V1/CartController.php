@@ -13,7 +13,7 @@ class CartController extends Controller
 {
     public function show(Request $request, CartService $cartService): JsonResponse
     {
-        $cart = $cartService->getOrCreateCart($request->user(), $request->session()->getId());
+        $cart = $cartService->getOrCreateCart($request->user('sanctum'), $request->session()->getId());
 
         return response()->json(['data' => $cart->load('items.variant.product')]);
     }
@@ -25,7 +25,7 @@ class CartController extends Controller
             'quantity' => ['required', 'integer', 'min:1'],
         ]);
 
-        $cart = $cartService->getOrCreateCart($request->user(), $request->session()->getId());
+        $cart = $cartService->getOrCreateCart($request->user('sanctum'), $request->session()->getId());
         $variant = ProductVariant::findOrFail($data['variant_id']);
 
         $item = $cartService->addItem($cart, $variant, $data['quantity']);
@@ -63,8 +63,8 @@ class CartController extends Controller
     private function authorizeItem(Request $request, CartItem $item): void
     {
         $cart = $item->cart;
-        $owns = $request->user() !== null
-            ? $cart->user_id === $request->user()->id
+        $owns = $request->user('sanctum') !== null
+            ? $cart->user_id === $request->user('sanctum')->id
             : $cart->session_id === $request->session()->getId();
 
         abort_unless($owns, 404);
