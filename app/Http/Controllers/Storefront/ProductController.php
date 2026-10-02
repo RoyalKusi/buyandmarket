@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Storefront;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Services\ReviewService;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 /**
@@ -17,12 +19,26 @@ use Illuminate\View\View;
  */
 class ProductController extends Controller
 {
-    public function show(Product $product): View
+    public function show(Product $product, ReviewService $reviewService): View
     {
         $this->authorize('view', $product);
 
+        $product->load([
+            'variants.attributeValues.attribute',
+            'category',
+            'brand',
+            'store.seller',
+            'images' => fn ($query) => $query->where('status', 'processed'),
+            'reviews' => fn ($query) => $query->published()->with('user')->latest(),
+        ]);
+
         return view('storefront.product', [
-            'product' => $product->load(['variants.attributeValues.attribute', 'category', 'brand', 'store.seller', 'images' => fn ($query) => $query->where('status', 'processed')]),
+            'product' => $product,
+            'reviewStats' => [
+                'average' => round((float) $product->reviews->avg('rating'), 1),
+                'count' => $product->reviews->count(),
+            ],
+            'canReview' => Auth::check() && $reviewService->canReview($product, Auth::user()),
             'breadcrumbs' => [
                 ['label' => 'Home', 'href' => route('storefront.home')],
                 ['label' => $product->category->name, 'href' => route('storefront.categories.show', $product->category)],

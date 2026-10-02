@@ -7,9 +7,11 @@ use App\Models\AuditLog;
 use App\Models\Conversation;
 use App\Models\ConversationMessage;
 use App\Models\Product;
+use App\Models\Review;
 use App\Models\Seller;
 use App\Services\KycReviewService;
 use App\Services\ProductService;
+use App\Services\ReviewService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -87,6 +89,35 @@ class AdminController extends Controller
      * deferred since Run 1.7. Every filter is optional and additive;
      * an admin with no filters sees exactly the previous unfiltered feed.
      */
+    /**
+     * TDD module 33's moderation worklist — reviews worth a second look,
+     * not every review ever written: the 1-2 star ones, where an abuse
+     * or policy-violation report is most likely to land.
+     */
+    public function reviews(): View
+    {
+        return view('dashboard.admin.reviews', [
+            'reviews' => Review::published()->where('rating', '<=', 2)->with('product', 'user')->latest()->paginate(25),
+        ]);
+    }
+
+    /**
+     * TDD module 33: admin may remove a review (spam, abuse, policy
+     * violation) — the review's own author never can (App\Policies\
+     * ReviewPolicy::remove() always returns false, only the Gate::before
+     * admin bypass reaches this).
+     */
+    public function removeReview(Request $request, Review $review, ReviewService $reviewService): RedirectResponse
+    {
+        $this->authorize('remove', $review);
+
+        $data = $request->validate(['reason_code' => ['required', 'string', 'max:100']]);
+
+        $reviewService->remove($review, $request->user(), $data['reason_code']);
+
+        return back()->with('status', 'Review removed.');
+    }
+
     public function auditLog(Request $request): View
     {
         $filters = $request->validate([

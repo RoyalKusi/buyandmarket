@@ -100,6 +100,14 @@ class Product extends Model
         return $processed->firstWhere('is_primary', true) ?? $processed->first();
     }
 
+    /**
+     * @return HasMany<Review, $this>
+     */
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class);
+    }
+
     public function scopeOwnedBySeller(Builder $query, Seller $seller): void
     {
         $query->whereHas('store', fn (Builder $q) => $q->where('seller_id', $seller->id));

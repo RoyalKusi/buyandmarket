@@ -1,10 +1,10 @@
 <x-layouts.storefront :title="$product->title" :description="Str::limit($product->description, 160)">
     {{--
-        Design System §6.4 (PDP). The image gallery (TDD §5.8, Run 1.15)
-        and Add to cart / Buy now (Run 1.12) and the AI "Ask about this
-        product" entry point (Run 1.12) are wired. Still omitted (flagged
-        in CHANGELOG.md): rating row and reviews tab content (module 33),
-        related/recently-viewed rails (module 40).
+        Design System §6.4 (PDP). The image gallery (TDD §5.8, Run 1.15),
+        Add to cart / Buy now (Run 1.12), the AI "Ask about this product"
+        entry point (Run 1.12), and the rating row/reviews tab (module
+        33, Run 1.17) are wired. Still omitted (flagged in
+        CHANGELOG.md): related/recently-viewed rails (module 40).
     --}}
     <div class="mx-auto max-w-[1280px] px-4 md:px-6 py-8">
         <x-breadcrumbs :items="$breadcrumbs" />
@@ -42,6 +42,13 @@
                 <a href="{{ route('storefront.stores.show', $product->store) }}" class="mt-2 inline-flex items-center gap-1 text-body-md text-slate-600 hover:text-blue-600">
                     {{ $product->store->name }}
                 </a>
+
+                @if ($reviewStats['count'] > 0)
+                    <a href="#reviews" class="mt-2 flex items-center gap-1 text-body-sm text-slate-600 hover:text-blue-600">
+                        <span class="text-amber-500">&#9733;</span>
+                        <span>{{ $reviewStats['average'] }} ({{ $reviewStats['count'] }} {{ Str::plural('review', $reviewStats['count']) }})</span>
+                    </a>
+                @endif
 
                 <p class="mt-4 text-price-lg text-blue-600">${{ number_format((float) $product->base_price, 2) }}</p>
 
@@ -83,6 +90,53 @@
                 </dl>
             </div>
         @endif
+
+        <div id="reviews" class="mt-8 border-t border-slate-100 pt-8">
+            <h2 class="text-heading-md text-slate-900 mb-3">
+                Reviews
+                @if ($reviewStats['count'] > 0)
+                    <span class="text-body-md text-slate-500 font-normal">({{ $reviewStats['average'] }} average, {{ $reviewStats['count'] }} {{ Str::plural('review', $reviewStats['count']) }})</span>
+                @endif
+            </h2>
+
+            @if ($canReview)
+                <form method="POST" action="{{ route('storefront.products.reviews.store', $product) }}" class="bg-slate-25 rounded-md p-4 mb-6 space-y-3 max-w-xl">
+                    @csrf
+                    <div>
+                        <label class="block text-body-sm text-slate-700 mb-1">Your rating</label>
+                        <select name="rating" required class="h-10 rounded-sm border border-slate-200 px-3 text-body-md">
+                            @foreach ([5, 4, 3, 2, 1] as $stars)
+                                <option value="{{ $stars }}">{{ $stars }} star{{ $stars > 1 ? 's' : '' }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-body-sm text-slate-700 mb-1">Title (optional)</label>
+                        <input type="text" name="title" class="w-full h-10 rounded-sm border border-slate-200 px-3 text-body-md">
+                    </div>
+                    <div>
+                        <label class="block text-body-sm text-slate-700 mb-1">Your review</label>
+                        <textarea name="body" rows="3" required class="w-full rounded-sm border border-slate-200 px-3 py-2 text-body-md"></textarea>
+                    </div>
+                    <button type="submit" class="h-10 rounded-sm bg-blue-600 text-slate-0 px-4 text-button font-semibold hover:bg-blue-500">Submit review</button>
+                </form>
+            @endif
+
+            @forelse ($product->reviews as $review)
+                <div class="border-b border-slate-100 py-4">
+                    <div class="flex items-center gap-2">
+                        <span class="text-amber-500">{{ str_repeat('★', $review->rating) }}{{ str_repeat('☆', 5 - $review->rating) }}</span>
+                        <span class="text-body-sm text-slate-500">{{ $review->user->name }} &middot; {{ $review->created_at->format('d M Y') }}</span>
+                    </div>
+                    @if ($review->title)
+                        <p class="text-body-md font-semibold text-slate-900 mt-1">{{ $review->title }}</p>
+                    @endif
+                    <p class="text-body-md text-slate-700 mt-1">{{ $review->body }}</p>
+                </div>
+            @empty
+                <p class="text-body-md text-slate-500">No reviews yet.</p>
+            @endforelse
+        </div>
 
         <div class="mt-8 border-t border-slate-100 pt-8">
             <h2 class="text-heading-md text-slate-900 mb-3">Seller information</h2>

@@ -95,4 +95,25 @@ class Seller extends Model
     {
         return $this->badges()->where('badge', $badge)->exists();
     }
+
+    /**
+     * TDD §3.1 module 6 "Top Rated (>=4.5 avg over >=20 reviews)" —
+     * aggregated across every one of this seller's products, computed
+     * fresh rather than cached (App\Services\SellerBadgeService calls
+     * this on its own recompute schedule, same as the other badges).
+     *
+     * @return array{average: float, count: int}
+     */
+    public function reviewStats(): array
+    {
+        $stats = Review::published()
+            ->whereHas('product', fn ($q) => $q->whereHas('store', fn ($q) => $q->where('seller_id', $this->id)))
+            ->selectRaw('AVG(rating) as average, COUNT(*) as count')
+            ->first();
+
+        return [
+            'average' => (float) ($stats->average ?? 0),
+            'count' => (int) ($stats->count ?? 0),
+        ];
+    }
 }

@@ -3,6 +3,57 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Run 1.17 — Reviews + Top Rated seller badge
+
+Scope: continuing the deferred-item pass. TDD module 33 (reviews),
+flagged since Run 1.3/1.4 as a prerequisite for the "Top Rated" badge
+and the PDP's rating row/reviews tab.
+
+### Added
+
+- **`reviews` table + `App\Models\Review`**: one review per verified
+  purchase (`order_id` is checked, not just recorded —
+  `App\Services\ReviewService` confirms a `confirmed`/`completed` order
+  actually containing the product before allowing a review at all),
+  unique per `(product_id, user_id)`. Admin removal is a status change
+  (`published` → `removed`), not a row deletion — same "soft, never
+  hard" reasoning TDD §6.4 rule 3 already applies to products.
+- **`App\Policies\ReviewPolicy`**: `create` delegates to
+  `ReviewService::canReview()`; `remove` always returns `false` — only
+  the `Gate::before` admin bypass can remove a review, never its own
+  author.
+- **PDP**: star rating summary, review list, and a "write a review"
+  form that only renders when `canReview()` is true for the signed-in
+  buyer.
+- **Admin**: `/admin/dashboard/reviews` — a worklist of 1-2 star reviews
+  (where an abuse report is most likely to land, not every review ever
+  written) with a reason-coded remove action.
+- **`SellerBadgeService`**: `top_rated` is now computed for real
+  (`Seller::reviewStats()`, >=4.5 average over >=20 published reviews
+  across all the seller's products, per TDD §3.1 module 6's exact rule)
+  — still only recalculated by the existing nightly
+  `sellers:recompute-badges` command, not inline on every review.
+
+### Verified against acceptance criteria
+
+- Full suite: 123 passed (427 assertions) — new coverage: verified-
+  purchase review creation, rejection for a non-purchaser and for a
+  merely-pending order, one-review-per-product enforcement, admin
+  removal (and that the author themselves cannot remove it), and the
+  Top Rated badge crossing (and failing to cross) its threshold.
+- Pint: clean. `migrate:fresh`: clean. Production build: 38.86KB
+  gzipped JS, unchanged — no new JS, the review form is a plain POST.
+
+### Deferred / flagged (still open)
+
+- No seller response to a review (a common marketplace feature) —
+  not named in the TDD's module 33 description, so out of scope rather
+  than silently added.
+- Fast Responder badge still not computed — depends on buyer-seller
+  messaging, which doesn't exist.
+- Wishlists, recommendations, sponsored placements, analytics-dependent
+  seller insights — unchanged from Run 1.14's list.
+
 ## Run 1.16 — Text-seeded categorization suggestions + brand-suggest web form
 
 Scope: continuing the deferred-item pass. Two small gaps, both on the
