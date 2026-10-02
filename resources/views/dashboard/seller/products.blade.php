@@ -25,6 +25,7 @@
                     </div>
 
                     <div class="flex flex-wrap gap-3 mb-4">
+                        <a href="{{ route('seller.dashboard.products.images', $product) }}" class="text-blue-600 hover:underline text-body-sm">Photos ({{ $product->images_count }})</a>
                         @if ($product->status === 'draft')
                             <form method="POST" action="{{ route('seller.dashboard.products.submit', $product) }}">
                                 @csrf

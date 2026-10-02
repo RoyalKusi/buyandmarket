@@ -22,7 +22,7 @@ class ProductController extends Controller
         $this->authorize('view', $product);
 
         return view('storefront.product', [
-            'product' => $product->load(['variants.attributeValues.attribute', 'category', 'brand', 'store.seller']),
+            'product' => $product->load(['variants.attributeValues.attribute', 'category', 'brand', 'store.seller', 'images' => fn ($query) => $query->where('status', 'processed')]),
             'breadcrumbs' => [
                 ['label' => 'Home', 'href' => route('storefront.home')],
                 ['label' => $product->category->name, 'href' => route('storefront.categories.show', $product->category)],

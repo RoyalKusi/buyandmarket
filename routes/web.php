@@ -87,6 +87,11 @@ Route::middleware('auth')->group(function () {
         Route::post('/products', [SellerController::class, 'storeProduct'])->name('products.store');
         Route::post('/products/{product}/submit', [SellerController::class, 'submitProductForReview'])->name('products.submit');
         Route::post('/products/{product}/archive', [SellerController::class, 'archiveProduct'])->name('products.archive');
+        Route::get('/products/{product}/images', [SellerController::class, 'manageImages'])->name('products.images');
+        Route::post('/products/{product}/images', [SellerController::class, 'storeImage'])->name('products.images.store');
+        Route::delete('/products/{product}/images/{image}', [SellerController::class, 'destroyImage'])->name('products.images.destroy');
+        Route::post('/products/{product}/images/{image}/primary', [SellerController::class, 'makeImagePrimary'])->name('products.images.primary');
+        Route::post('/products/{product}/images/{image}/alt-text', [SellerController::class, 'generateImageAltText'])->name('products.images.alt-text');
         Route::post('/products/{product}/ai-description', [SellerController::class, 'suggestDescription'])->name('products.ai-description.suggest');
         Route::post('/products/{product}/ai-description/accept', [SellerController::class, 'acceptDescription'])->name('products.ai-description.accept');
         Route::post('/products/{product}/ai-description/discard', [SellerController::class, 'discardDescription'])->name('products.ai-description.discard');

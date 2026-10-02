@@ -85,4 +85,33 @@ class ListingAssistant
 
         return $product;
     }
+
+    /**
+     * TDD §5.8's alt-text step, scoped honestly per docs/adr/0007: seeded
+     * from catalogue data (title, category, attribute values already on
+     * the product), not from the image's actual pixels — no vision-
+     * capable provider is wired in. Applied directly to the image rather
+     * than staged for Accept/Discard like the description suggestion:
+     * an alt-text string is a low-stakes accessibility label, not
+     * customer-facing marketing copy, so the TDD §5.7 "never auto-
+     * applied" guardrail is reserved for content that actually
+     * represents the seller's claims about the product.
+     */
+    public function suggestAltText(Product $product): string
+    {
+        $attributeValues = $product->variants->flatMap->attributeValues->unique('id')->pluck('value')->implode(', ');
+
+        $completion = $this->llm->complete([
+            [
+                'role' => 'system',
+                'content' => 'Write a single, concise (under 125 characters) image alt-text description for an e-commerce product photo, for screen readers. No marketing language, just what the photo most likely shows.',
+            ],
+            [
+                'role' => 'user',
+                'content' => "Product: {$product->title}\nCategory: {$product->category?->name}\nKnown attributes: {$attributeValues}",
+            ],
+        ]);
+
+        return trim((string) $completion->content, " \t\n\r\0\x0B\"");
+    }
 }

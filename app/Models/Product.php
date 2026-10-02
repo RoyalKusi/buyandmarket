@@ -85,6 +85,21 @@ class Product extends Model
         return $this->hasMany(PriceHistory::class);
     }
 
+    /**
+     * @return HasMany<ProductImage, $this>
+     */
+    public function images(): HasMany
+    {
+        return $this->hasMany(ProductImage::class)->orderBy('sort_order');
+    }
+
+    public function primaryImage(): ?ProductImage
+    {
+        $processed = $this->images->where('status', 'processed');
+
+        return $processed->firstWhere('is_primary', true) ?? $processed->first();
+    }
+
     public function scopeOwnedBySeller(Builder $query, Seller $seller): void
     {
         $query->whereHas('store', fn (Builder $q) => $q->where('seller_id', $seller->id));

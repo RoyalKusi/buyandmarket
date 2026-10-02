@@ -45,6 +45,11 @@ class ProductPolicy
         return $this->isOwner($user, $product);
     }
 
+    public function manageImages(User $user, Product $product): bool
+    {
+        return $this->isOwner($user, $product);
+    }
+
     /**
      * Only an admin may move a product out of moderation — never the
      * seller who submitted it (Gate::before is the only path to true).

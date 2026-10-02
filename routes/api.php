@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\V1\Seller\BrandController as SellerBrandController;
 use App\Http\Controllers\Api\V1\Seller\DeliveryRateCardController;
 use App\Http\Controllers\Api\V1\Seller\OnboardingController as SellerOnboardingController;
 use App\Http\Controllers\Api\V1\Seller\ProductController as SellerProductController;
+use App\Http\Controllers\Api\V1\Seller\ProductImageController as SellerProductImageController;
 use App\Http\Controllers\Api\V1\Seller\ShipmentController as SellerShipmentController;
 use App\Http\Controllers\Api\V1\Shipper\OnboardingController as ShipperOnboardingController;
 use App\Http\Controllers\Api\V1\Shipper\ShipmentController as ShipperShipmentController;
@@ -129,6 +130,14 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
                 Route::post('/products/{product}/submit', [SellerProductController::class, 'submitForReview'])->name('products.submit');
                 Route::post('/products/{product}/archive', [SellerProductController::class, 'archive'])->name('products.archive');
                 Route::patch('/products/{product}/price', [SellerProductController::class, 'updatePrice'])->name('products.price');
+
+                // TDD §3.2 module 7 / §5.8: the image pipeline (App\
+                // Services\ProductImageService) — deferred whole since
+                // Run 1.2, added in Run 1.15.
+                Route::post('/products/{product}/images', [SellerProductImageController::class, 'store'])->name('products.images.store');
+                Route::delete('/products/{product}/images/{image}', [SellerProductImageController::class, 'destroy'])->name('products.images.destroy');
+                Route::post('/products/{product}/images/{image}/primary', [SellerProductImageController::class, 'makePrimary'])->name('products.images.primary');
+                Route::post('/products/{product}/images/reorder', [SellerProductImageController::class, 'reorder'])->name('products.images.reorder');
 
                 // TDD §3.4 modules 22/26: rate cards double as "which
                 // zones/methods this seller serves" (no separate opt-in

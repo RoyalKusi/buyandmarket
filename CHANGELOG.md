@@ -3,6 +3,66 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Run 1.15 — Product image pipeline + PDP gallery
+
+Scope: continuing the deferred-item pass (Runs 1.12-1.14). The largest
+remaining gap: products had no images anywhere in the system — flagged
+whole since Run 1.2 rather than shipped half-built ("adding a bare,
+un-pipelined image field now would mean either reworking it later or
+shipping catalogue images that never got a quality/authenticity pass").
+This closes it: validation, deterministic quality scoring, variant
+generation, and alt-text (TDD §3.2 module 7 / §5.8).
+
+### Added
+
+- **`product_images` table + `App\Models\ProductImage`**: one row per
+  upload, keyed to the product it belongs to, with width/height/size
+  captured at upload time, a `processed`/`rejected` status, and an
+  optional `rejection_reason` — a rejected photo is kept (not deleted)
+  so the seller can see exactly why.
+- **`App\Services\ProductImageService`**: validates and quality-scores
+  every upload deterministically (minimum 500×500px, aspect ratio no
+  more extreme than 3:1, 10MB ceiling — see docs/adr/0007 for why this
+  is deterministic rather than a vision model's judgement call), then
+  generates a centre-cropped 300×300 thumbnail and a max-1600px large
+  variant with PHP's bundled GD extension (no new dependency). Runs
+  inline on the request, not queued — same reasoning as `ai:reindex`
+  (Run 1.8): this launch topology has no queue worker guaranteed
+  running, and a seller actively waiting on an upload is a poor fit for
+  "eventually" regardless.
+- **`docs/adr/0007`**: documents why "quality scoring" is deterministic
+  and why alt-text (`App\Services\Ai\ListingAssistant::
+  suggestAltText()`) is seeded from catalogue data (title, category,
+  attributes) rather than the image's actual pixels — no vision-capable
+  `LlmProvider` implementation exists, same sandbox-network constraint
+  already documented for Pesepay/Paynow and vector search (ADR 0006).
+- **Seller dashboard**: `seller/dashboard/products/{product}/images` —
+  upload, delete, set-primary, generate-alt-text, linked from the
+  products list ("Photos (N)"). **API**: the same four actions under
+  `POST/DELETE /api/v1/seller/products/{product}/images[/...]`, inside
+  the existing `seller.scope` group.
+- **PDP gallery**: main image + thumbnail strip (Alpine-driven, no new
+  JS dependency), falls back to the existing letter-placeholder when a
+  product has no processed images yet.
+
+### Verified against acceptance criteria
+
+- Full suite: 113 passed (405 assertions) — new coverage: upload +
+  variant generation, below-minimum-resolution rejection (kept, not
+  deleted), cross-seller 403/404, delete-reassigns-primary, PDP renders
+  the uploaded image, alt-text generation.
+- Pint: clean. `migrate:fresh`: clean. Production build: 38.86KB
+  gzipped JS, unchanged — the gallery's interactivity is plain Alpine.
+
+### Deferred / flagged (still open)
+
+- **Photo-driven category/attribute suggestions** (TDD §5.6's "suggest a
+  category from a photo, extract colour/material") remain out of scope
+  — see docs/adr/0007. Run 1.16 adds a text-seeded version of this
+  (title + bullets, not pixels), a real but narrower capability.
+- No background/batch reprocessing if the quality thresholds change
+  later — rejected images stay rejected until the seller re-uploads.
+
 ## Run 1.14 — Deferred-item polish: self-service web forms, audit-log filtering
 
 Scope: continuing the same deferred-item pass as Runs 1.12-1.13. Three

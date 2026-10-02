@@ -9,8 +9,10 @@ use App\Models\DeliveryRateCard;
 use App\Models\DeliveryZone;
 use App\Models\OrderGroup;
 use App\Models\Product;
+use App\Models\ProductImage;
 use App\Models\ProductVariant;
 use App\Services\Ai\ListingAssistant;
+use App\Services\ProductImageService;
 use App\Services\ProductService;
 use App\Services\ShippingService;
 use Illuminate\Http\RedirectResponse;
@@ -51,7 +53,7 @@ class SellerController extends Controller
 
     public function products(): View
     {
-        $products = Product::query()->latest()->paginate(15);
+        $products = Product::query()->withCount('images')->latest()->paginate(15);
 
         // TDD §5.6 "pricing insights": compares a seller's price against
         // the category price distribution — computed directly here
@@ -180,6 +182,64 @@ class SellerController extends Controller
         $productService->archive($product, $request->user());
 
         return back()->with('status', 'Product archived.');
+    }
+
+    /**
+     * TDD §3.2 module 7 / §5.8: the product-image pipeline's dashboard
+     * presentation — deferred whole since Run 1.2, added in Run 1.15.
+     */
+    public function manageImages(Request $request, Product $product): View
+    {
+        $this->authorize('manageImages', $product);
+
+        return view('dashboard.seller.product-images', [
+            'product' => $product->load('images'),
+        ]);
+    }
+
+    public function storeImage(Request $request, Product $product, ProductImageService $imageService): RedirectResponse
+    {
+        $this->authorize('manageImages', $product);
+
+        $data = $request->validate([
+            'image' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+        ]);
+
+        $image = $imageService->upload($product, $data['image'], $request->user());
+
+        return back()->with('status', $image->status === 'processed'
+            ? 'Image uploaded.'
+            : "Image rejected: {$image->rejection_reason}");
+    }
+
+    public function destroyImage(Request $request, Product $product, ProductImage $image, ProductImageService $imageService): RedirectResponse
+    {
+        $this->authorize('manageImages', $product);
+        abort_unless($image->product_id === $product->id, 404);
+
+        $imageService->destroy($image, $request->user());
+
+        return back()->with('status', 'Image removed.');
+    }
+
+    public function makeImagePrimary(Product $product, ProductImage $image, ProductImageService $imageService): RedirectResponse
+    {
+        $this->authorize('manageImages', $product);
+        abort_unless($image->product_id === $product->id, 404);
+
+        $imageService->makePrimary($image);
+
+        return back()->with('status', 'Primary image updated.');
+    }
+
+    public function generateImageAltText(Product $product, ProductImage $image, ListingAssistant $assistant): RedirectResponse
+    {
+        $this->authorize('manageImages', $product);
+        abort_unless($image->product_id === $product->id, 404);
+
+        $image->update(['alt_text' => $assistant->suggestAltText($product)]);
+
+        return back()->with('status', 'Alt text generated.');
     }
 
     public function orders(): View

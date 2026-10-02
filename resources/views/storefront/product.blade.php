@@ -1,18 +1,40 @@
 <x-layouts.storefront :title="$product->title" :description="Str::limit($product->description, 160)">
     {{--
-        Design System §6.4 (PDP). Omitted here (flagged in CHANGELOG.md,
-        Run 1.4): the real image gallery (module 5.8, Run 1.9), rating
-        row and reviews tab content (module 33), related/recently-viewed
-        rails (module 40). Add to cart / Buy now (Run 1.12) and the AI
-        "Ask about this product" entry point (Run 1.12) are wired.
+        Design System §6.4 (PDP). The image gallery (TDD §5.8, Run 1.15)
+        and Add to cart / Buy now (Run 1.12) and the AI "Ask about this
+        product" entry point (Run 1.12) are wired. Still omitted (flagged
+        in CHANGELOG.md): rating row and reviews tab content (module 33),
+        related/recently-viewed rails (module 40).
     --}}
     <div class="mx-auto max-w-[1280px] px-4 md:px-6 py-8">
         <x-breadcrumbs :items="$breadcrumbs" />
 
         <div class="mt-6 grid grid-cols-1 lg:grid-cols-[55fr_45fr] gap-8">
-            <div class="aspect-square bg-slate-25 rounded-md flex items-center justify-center" aria-hidden="true">
-                <span class="text-display-xl text-slate-300 font-display">{{ Str::of($product->title)->substr(0, 1)->upper() }}</span>
-            </div>
+            @if ($product->images->isNotEmpty())
+                <div x-data="{ active: '{{ $product->primaryImage()?->id }}' }">
+                    <div class="aspect-square bg-slate-25 rounded-md overflow-hidden">
+                        @foreach ($product->images as $image)
+                            <img x-show="active === '{{ $image->id }}'" src="{{ $image->variantUrl('large') }}" alt="{{ $image->alt_text ?: $product->title }}" class="w-full h-full object-contain">
+                        @endforeach
+                    </div>
+
+                    @if ($product->images->count() > 1)
+                        <div class="mt-3 grid grid-cols-5 gap-2">
+                            @foreach ($product->images as $image)
+                                <button type="button" @click="active = '{{ $image->id }}'"
+                                    class="aspect-square rounded-sm overflow-hidden border-2"
+                                    :class="active === '{{ $image->id }}' ? 'border-blue-600' : 'border-transparent'">
+                                    <img src="{{ $image->variantUrl('thumb') }}" alt="" class="w-full h-full object-cover">
+                                </button>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+            @else
+                <div class="aspect-square bg-slate-25 rounded-md flex items-center justify-center" aria-hidden="true">
+                    <span class="text-display-xl text-slate-300 font-display">{{ Str::of($product->title)->substr(0, 1)->upper() }}</span>
+                </div>
+            @endif
 
             <div>
                 <h1 class="text-heading-lg text-slate-900">{{ $product->title }}</h1>
