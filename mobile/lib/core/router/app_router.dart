@@ -22,12 +22,21 @@ import '../../screens/wishlist/wishlist_screen.dart';
 const _authGatedPaths = ['/cart', '/checkout', '/orders', '/wishlist'];
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authProvider);
-
   return GoRouter(
     initialLocation: '/',
     refreshListenable: _AuthRefreshListenable(ref),
     redirect: (context, state) {
+      // Read, not watch: this must be the *current* auth state at the
+      // moment each navigation is evaluated, not a value captured when
+      // this provider was first built. Watching here previously made
+      // every auth change rebuild the whole routerProvider — recreating
+      // GoRouter from scratch and snapping the app back to
+      // initialLocation ('/'), discarding whatever navigation (e.g. the
+      // post-login redirect to the page that gated the user) was
+      // already in flight. refreshListenable below is what re-runs this
+      // callback on an auth change instead, without tearing the router
+      // down.
+      final authState = ref.read(authProvider);
       if (authState.status == AuthStatus.unknown) return null;
 
       final goingToAuthGated = _authGatedPaths.any((p) => state.matchedLocation.startsWith(p));

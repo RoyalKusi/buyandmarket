@@ -12,6 +12,6 @@ class ProductController extends Controller
     {
         $this->authorize('view', $product);
 
-        return response()->json(['data' => $product->load('variants', 'category', 'brand')]);
+        return response()->json(['data' => $product->load('variants', 'category', 'brand', 'store')]);
     }
 }
