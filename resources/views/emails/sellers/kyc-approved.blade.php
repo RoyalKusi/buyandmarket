@@ -1,4 +1,4 @@
-<x-emails.layout :preheader="$seller->business_name . ' has been approved — your store is now live'">
+<x-emails.layout :preheader="$seller->business_name . ' has been approved — your store is now live'" :message="$message">
     <x-emails.badge tone="success">Seller account approved</x-emails.badge>
 
     <h1 style="margin:0 0 12px; font-family:'Space Grotesk', Arial, Helvetica, sans-serif; font-size:24px; line-height:30px; font-weight:700; letter-spacing:-0.01em; color:#131926;">

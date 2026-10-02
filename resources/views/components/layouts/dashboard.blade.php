@@ -20,8 +20,8 @@
     --}}
     <div class="min-h-full flex">
         <aside class="w-[240px] shrink-0 bg-slate-0 border-r border-slate-100 hidden md:flex md:flex-col">
-            <a href="{{ route('storefront.home') }}" class="h-[72px] flex items-center px-6 text-heading-sm font-display text-blue-600">
-                BuyAndMarket
+            <a href="{{ route('storefront.home') }}" class="h-[72px] flex items-center px-6" aria-label="BuyAndMarket home">
+                <img src="{{ asset('images/logo-blue.png') }}" alt="BuyAndMarket" class="h-8 w-auto">
             </a>
 
             <nav class="flex-1 px-3 py-4 space-y-6 text-body-md">

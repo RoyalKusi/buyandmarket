@@ -1,4 +1,4 @@
-<x-emails.layout :preheader="'Your seller application needs attention — ' . $reasonCode">
+<x-emails.layout :preheader="'Your seller application needs attention — ' . $reasonCode" :message="$message">
     <x-emails.badge tone="danger">Application needs attention</x-emails.badge>
 
     <h1 style="margin:0 0 12px; font-family:'Space Grotesk', Arial, Helvetica, sans-serif; font-size:24px; line-height:30px; font-weight:700; letter-spacing:-0.01em; color:#131926;">

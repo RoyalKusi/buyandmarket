@@ -3,6 +3,48 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Real brand logo wired in across the UI and emails
+
+Scope: user-supplied logo asset. Every previous "branded" surface (site
+header, guest auth pages, dashboard sidebar, email header band) used a
+styled text wordmark rather than the actual provided logo mark.
+
+### Added
+
+- `public/images/logo-blue.png` / `logo-white.png`: the logo cropped to
+  its bounding box with a transparent background, in two colorways —
+  blue (for white/light surfaces: the site header, auth pages, dashboard
+  sidebar) and white (for the blue email header band, where the blue
+  mark would be invisible).
+- Site header (`components/layouts/storefront.blade.php`), the guest
+  auth layout (`components/layouts/guest.blade.php`), and the dashboard
+  sidebar (`components/layouts/dashboard.blade.php`) now render the
+  actual logo image instead of a text wordmark.
+- Email layout (`components/emails/layout.blade.php`) now embeds the
+  white logo as a `cid:` inline attachment via Laravel's `$message->embed()`,
+  the correct technique for a real image in HTML email — a `data:` URI
+  would silently fail to render in several Outlook builds. `$message` is
+  injected by `Illuminate\Mail\Mailer` into each top-level mail view but
+  isn't inherited by Blade components automatically, so all 8 email
+  templates now pass it through explicitly as `:message="$message"`.
+  Falls back to the old text wordmark if `$message` is ever unset (e.g.
+  a future caller that renders the layout outside a real mail pipeline).
+
+### Verified against acceptance criteria
+
+- Full suite: 189 passed (615 assertions) — unchanged; existing
+  `->render()`-based template tests still pass because `Mailer::render()`
+  converts the `cid:` reference back into a raw inline image for
+  standalone preview, the same mechanism used for browser-previewing
+  any Laravel mail attachment.
+- Rendered all 8 email templates and screenshotted them — the logo
+  renders crisp and fully legible against the blue header band.
+- Spun up the app against a disposable SQLite database with demo data
+  and screenshotted the homepage, login page, and dashboard sidebar —
+  logo renders correctly in every site surface.
+- Pint clean. Production build unchanged at 38.86KB gzipped JS (the
+  logo is a static asset referenced by `asset()`, not bundled by Vite).
+
 ## Branded HTML email templates
 
 Scope: user feedback — "The emails should have very beautiful, well

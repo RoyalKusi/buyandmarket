@@ -22,8 +22,8 @@
     --}}
     <header class="sticky top-0 z-40 bg-slate-0 border-b border-slate-100">
         <div class="mx-auto max-w-[1280px] px-4 md:px-6 h-[72px] flex items-center gap-6">
-            <a href="{{ route('storefront.home') }}" class="shrink-0 text-heading-md font-display text-blue-600" aria-label="BuyAndMarket home">
-                BuyAndMarket
+            <a href="{{ route('storefront.home') }}" class="shrink-0" aria-label="BuyAndMarket home">
+                <img src="{{ asset('images/logo-blue.png') }}" alt="BuyAndMarket" class="h-9 w-auto">
             </a>
 
             <form action="{{ route('storefront.search') }}" method="GET" class="flex-1 max-w-[640px]">

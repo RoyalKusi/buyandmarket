@@ -10,8 +10,8 @@
 </head>
 <body class="h-full bg-slate-50 flex items-center justify-center px-4">
     <div class="w-full max-w-[420px] py-16">
-        <a href="{{ route('storefront.home') }}" class="block text-center text-heading-lg font-display text-blue-600 mb-8" aria-label="BuyAndMarket home">
-            BuyAndMarket
+        <a href="{{ route('storefront.home') }}" class="flex justify-center mb-8" aria-label="BuyAndMarket home">
+            <img src="{{ asset('images/logo-blue.png') }}" alt="BuyAndMarket" class="h-11 w-auto">
         </a>
 
         <div class="bg-slate-0 border border-slate-100 rounded-md shadow-[0_1px_2px_rgba(19,25,38,.06),0_1px_1px_rgba(19,25,38,.04)] p-8">

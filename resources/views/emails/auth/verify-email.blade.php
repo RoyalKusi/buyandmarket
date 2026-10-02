@@ -1,4 +1,4 @@
-<x-emails.layout preheader="Confirm your email address to finish setting up your account">
+<x-emails.layout preheader="Confirm your email address to finish setting up your account" :message="$message">
     <h1 style="margin:0 0 12px; font-family:'Space Grotesk', Arial, Helvetica, sans-serif; font-size:24px; line-height:30px; font-weight:700; letter-spacing:-0.01em; color:#131926;">
         Confirm your email address
     </h1>

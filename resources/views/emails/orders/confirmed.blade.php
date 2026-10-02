@@ -1,4 +1,4 @@
-<x-emails.layout :preheader="'Your order ' . $order->order_number . ' is confirmed — total $' . number_format((float) $order->total, 2)">
+<x-emails.layout :preheader="'Your order ' . $order->order_number . ' is confirmed — total $' . number_format((float) $order->total, 2)" :message="$message">
     <x-emails.badge tone="success">Order confirmed</x-emails.badge>
 
     <h1 style="margin:0 0 12px; font-family:'Space Grotesk', Arial, Helvetica, sans-serif; font-size:24px; line-height:30px; font-weight:700; letter-spacing:-0.01em; color:#131926;">

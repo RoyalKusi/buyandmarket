@@ -1,4 +1,17 @@
-@props(['preheader' => null])
+@props(['preheader' => null, 'message' => null])
+{{--
+    $message is injected by Illuminate\Mail\Mailer into the top-level mail
+    view's data (both the Mailable::content() path and the Notification
+    MailMessage::view() path used for VerifyEmail/ResetPassword — see
+    AppServiceProvider::boot()'s toMailUsing() hooks) — but Blade
+    components don't inherit the including view's variable scope
+    automatically, so every top-level template passes it through
+    explicitly as :message="$message". ->embed() attaches the logo as a
+    cid: inline image — the correct, broadly-compatible way to put a real
+    image in an HTML email, unlike a data: URI which several Outlook
+    builds silently fail to render.
+--}}
+@php($logoCid = $message?->embed(public_path('images/logo-white.png')))
 <!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
@@ -46,11 +59,17 @@
                 <table role="presentation" class="bm-container" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px; max-width:600px; background-color:#FFFFFF; border-radius:12px; overflow:hidden;">
                     {{-- Header: brand wordmark on a deep royal-blue band, gold underline accent (§1.5 — gold never used for primary CTAs, only as this accent). --}}
                     <tr>
-                        <td style="background-color:#003594; padding:28px 40px; border-bottom:3px solid #FFB81C;" class="bm-px">
+                        <td style="background-color:#003594; padding:24px 40px; border-bottom:3px solid #FFB81C;" class="bm-px">
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                                 <tr>
-                                    <td style="font-family:'Space Grotesk', Arial, Helvetica, sans-serif; font-size:22px; line-height:28px; font-weight:700; letter-spacing:-0.01em; color:#FFFFFF;">
-                                        Buy<span style="color:#FFC94D;">And</span>Market
+                                    <td>
+                                        @if ($logoCid)
+                                            <img src="{{ $logoCid }}" alt="BuyAndMarket" width="132" height="52" style="display:block; width:132px; height:52px; border:0;">
+                                        @else
+                                            <span style="font-family:'Space Grotesk', Arial, Helvetica, sans-serif; font-size:22px; line-height:28px; font-weight:700; letter-spacing:-0.01em; color:#FFFFFF;">
+                                                Buy<span style="color:#FFC94D;">And</span>Market
+                                            </span>
+                                        @endif
                                     </td>
                                 </tr>
                             </table>
