@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\Admin\KycReviewController;
 use App\Http\Controllers\Api\V1\Admin\ProductModerationController;
 use App\Http\Controllers\Api\V1\Admin\RoleAssignmentController;
 use App\Http\Controllers\Api\V1\Ai\ConversationController;
+use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CartController;
 use App\Http\Controllers\Api\V1\CategoryController;
 use App\Http\Controllers\Api\V1\CheckoutController;
@@ -25,6 +26,21 @@ use Illuminate\Support\Facades\Route;
 // TDD §7.1: base path /api/v1; breaking changes ship as /api/v2 with v1
 // maintained on a published deprecation timeline.
 Route::prefix('v1')->name('api.v1.')->group(function () {
+    // Mobile/third-party token auth — see App\Http\Controllers\Api\V1\
+    // AuthController's own class doc for why this wraps Fortify's own
+    // CreateNewUser/ResetUserPassword actions rather than duplicating them.
+    Route::prefix('auth')->name('auth.')->group(function () {
+        Route::post('/register', [AuthController::class, 'register'])->name('register');
+        Route::post('/login', [AuthController::class, 'login'])->name('login');
+        Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->name('forgot-password');
+        Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('reset-password');
+
+        Route::middleware('auth:sanctum')->group(function () {
+            Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+            Route::get('/user', [AuthController::class, 'user'])->name('user');
+        });
+    });
+
     // Public catalogue reads (TDD §7.3).
     Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index');
     Route::get('/products/{product}', [ProductController::class, 'show'])->name('products.show');

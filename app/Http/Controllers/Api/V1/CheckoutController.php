@@ -21,15 +21,15 @@ class CheckoutController extends Controller
             // *input field*, which never exists — the actual condition is
             // "no authenticated user", which isn't expressible as a
             // static rule string, hence the conditional array below.
-            'guest_email' => [$request->user() ? 'nullable' : 'required', 'email'],
+            'guest_email' => [$request->user('sanctum') ? 'nullable' : 'required', 'email'],
             'guest_phone' => ['nullable', 'string'],
         ]);
 
-        $cart = $cartService->getOrCreateCart($request->user(), $request->session()->getId());
+        $cart = $cartService->getOrCreateCart($request->user('sanctum'), $request->session()->getId());
 
         $session = $checkoutService->start(
             $cart,
-            $request->user(),
+            $request->user('sanctum'),
             $data['guest_email'] ?? null,
             $data['guest_phone'] ?? null,
         );
@@ -51,7 +51,7 @@ class CheckoutController extends Controller
         $data = $request->validate(['address_id' => ['required', 'exists:addresses,id']]);
         $address = Address::findOrFail($data['address_id']);
 
-        abort_unless($request->user() && $address->user_id === $request->user()->id, 403);
+        abort_unless($request->user('sanctum') && $address->user_id === $request->user('sanctum')->id, 403);
 
         return response()->json(['data' => $checkoutService->setAddress($checkoutSession, $address)]);
     }
@@ -113,8 +113,8 @@ class CheckoutController extends Controller
     private function authorizeSession(CheckoutSession $checkoutSession): void
     {
         $request = request();
-        $owns = $request->user() !== null
-            ? $checkoutSession->user_id === $request->user()->id
+        $owns = $request->user('sanctum') !== null
+            ? $checkoutSession->user_id === $request->user('sanctum')->id
             : $checkoutSession->cart->session_id === $request->session()->getId();
 
         abort_unless($owns, 404);

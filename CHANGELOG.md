@@ -3,6 +3,84 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Mobile app groundwork — token auth + a real Bearer-token correctness bug
+
+Scope: the user's own informal "Phase 2" (distinct from README.md's
+Roadmap section) — a cross-platform Flutter mobile app, buyer-facing
+MVP, in a new separate repository. This is the backend half: what a
+mobile client needs from this API before any Flutter code can be
+written against it.
+
+### Fixed — a real, previously-undetected bug
+
+`App\Http\Controllers\Api\V1\CartController`, `CheckoutController`, and
+`Ai\ConversationController` all resolved the acting user via the bare
+`$request->user()` — the default `'web'` session guard — instead of
+`$request->user('sanctum')`, the only guard that also recognises a
+real `Authorization: Bearer <token>` request with no session cookie.
+Every existing test for these endpoints used `actingAs($user)`, which
+only ever populated the `'web'` guard — real token transmission was
+never exercised, so a genuine mobile client sending nothing but a
+bearer token was silently treated as a guest on every cart/checkout/AI
+request. Found while reasoning through what a Flutter client would
+actually need to work, not by any test catching it.
+
+- All three controllers now call `$request->user('sanctum')`.
+- `Tests\TestCase::actingAs()` overridden to authenticate both the
+  `'web'` and `'sanctum'` guards by default (explicit-guard calls are
+  untouched) — making every existing `actingAs()` call site mean what
+  it already assumed, without editing dozens of individual tests.
+  Hit (and fixed) a real `AuthManager` quirk along the way:
+  `shouldUse(null)`'s fallback reads `config('auth.defaults.guard')`,
+  but `setDefaultDriver()` mutates that exact same config key — so
+  authenticating `'sanctum'` first silently poisoned a later
+  null-guard call into staying on `'sanctum'` instead of returning to
+  `'web'`. Fixed by naming `'web'` explicitly rather than relying on
+  the (now unreliable) null-guard fallback.
+- New `tests/Feature/Commerce/MobileBearerTokenAuthTest.php`: drives
+  cart add, cart retrieval, and the start of checkout with a *real*
+  issued Sanctum token sent via `withToken()` — actual HTTP
+  Authorization header, no test-only auth shortcut — the thing no
+  existing test had ever done. Also covers an invalid token correctly
+  falling back to guest behaviour rather than a 500.
+
+### Added — mobile token-auth API
+
+- `App\Http\Controllers\Api\V1\AuthController`:
+  `POST /api/v1/auth/register`, `/login`, `/forgot-password`,
+  `/reset-password`, and (behind `auth:sanctum`) `/logout` and `/user`.
+  Wraps Fortify's own `CreateNewUser`/`ResetUserPassword` actions
+  directly rather than duplicating password-policy or role-assignment
+  logic — a buyer's account rules never drift between the web and
+  mobile signup paths.
+  - `/login` mirrors Fortify's own 5-per-minute email+IP rate limit.
+  - An account with two-factor authentication enabled is rejected with
+    a clear message rather than silently mishandled — TOTP's mandatory
+    seller/admin requirement (TDD §8.2) has no mobile screen yet, and
+    buyers (this MVP's whole scope) never have it enabled by default.
+  - `/register` fires the same `Registered` event the web form does,
+    so the already-wired verification-email listener covers mobile
+    signups too, unchanged.
+- `tests/Feature/Api/MobileAuthTest.php`: 10 tests — registration
+  (success, weak/mismatched password rejected), a freshly-issued token
+  actually authenticating a follow-up request, login (success, wrong
+  password, rate-limited after 5 attempts, 2FA account rejected),
+  logout actually revoking the token (not just returning 204), and
+  forgot/reset-password end-to-end.
+
+### Verified
+
+- Full suite: 203 passed (659 assertions), up from 189 — all genuinely
+  new coverage, no existing test weakened to get there.
+- Pint clean. `vendor/bin/phpstan analyse`: 0 errors.
+- `migrate:fresh` clean — no schema change, this is pure application
+  code.
+
+### Next
+
+Scaffolding the Flutter app itself, in a new `buyandmarket-mobile`
+repository, against this API.
+
 ## CI: fixed the Tests (PHP 8.3) job — lockfile silently required PHP 8.4
 
 Scope: the previous fix round's own push turned up a third, independent
