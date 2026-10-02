@@ -13,6 +13,8 @@ use App\Services\Ai\OpenAiCompatibleLlmProvider;
 use App\Services\Search\EloquentSearchProvider;
 use Illuminate\Auth\Events\Attempting;
 use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Registered;
+use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -51,6 +53,15 @@ class AppServiceProvider extends ServiceProvider
         // App\Listeners\MergeGuestCartOnLogin's own doc comment).
         Event::listen(Attempting::class, StashSessionIdBeforeLogin::class);
         Event::listen(Login::class, MergeGuestCartOnLogin::class);
+
+        // Production Readiness Report condition #3: email verification.
+        // Laravel 11 has no EventServiceProvider stub (auto-discovery
+        // covers most cases, but not this pairing) — without this line,
+        // enabling Features::emailVerification() in config/fortify.php
+        // adds the verify/resend routes and the `verified` middleware
+        // check, but never actually sends the first verification email
+        // on registration.
+        Event::listen(Registered::class, SendEmailVerificationNotification::class);
 
         // TDD §8.2: minimum 10 characters, breached-password check via a
         // k-anonymity API (HaveIBeenPwned range query) at registration/reset.

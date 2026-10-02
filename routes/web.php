@@ -72,15 +72,24 @@ Route::middleware('auth')->group(function () {
     // web flows — deliberately outside seller.scope/2fa, which both
     // require the role to already exist. Registering as a seller is the
     // very thing that creates it.
-    Route::get('/dashboard/become-seller', [SellerOnboardingController::class, 'show'])->name('dashboard.become-seller');
-    Route::post('/dashboard/become-seller', [SellerOnboardingController::class, 'register'])->name('dashboard.become-seller.register');
-    Route::post('/dashboard/become-seller/kyc-documents', [SellerOnboardingController::class, 'submitKycDocuments'])->name('dashboard.become-seller.kyc-documents');
-    Route::post('/dashboard/become-seller/payout-details', [SellerOnboardingController::class, 'submitPayoutDetails'])->name('dashboard.become-seller.payout-details');
-    Route::post('/dashboard/become-seller/store', [SellerOnboardingController::class, 'createStore'])->name('dashboard.become-seller.store');
-    Route::post('/dashboard/become-seller/submit-for-review', [SellerOnboardingController::class, 'submitForReview'])->name('dashboard.become-seller.submit-for-review');
+    //
+    // Production Readiness Report condition #3: gated behind `verified`
+    // (unlike checkout, which only gates the buyer flow) because these
+    // onboarding flows collect KYC documents and payout bank details —
+    // identity/financial data that should only ever be attached to a
+    // confirmed-reachable email address, since that's also where KYC
+    // approval/rejection and future payout notices are sent.
+    Route::middleware('verified')->group(function () {
+        Route::get('/dashboard/become-seller', [SellerOnboardingController::class, 'show'])->name('dashboard.become-seller');
+        Route::post('/dashboard/become-seller', [SellerOnboardingController::class, 'register'])->name('dashboard.become-seller.register');
+        Route::post('/dashboard/become-seller/kyc-documents', [SellerOnboardingController::class, 'submitKycDocuments'])->name('dashboard.become-seller.kyc-documents');
+        Route::post('/dashboard/become-seller/payout-details', [SellerOnboardingController::class, 'submitPayoutDetails'])->name('dashboard.become-seller.payout-details');
+        Route::post('/dashboard/become-seller/store', [SellerOnboardingController::class, 'createStore'])->name('dashboard.become-seller.store');
+        Route::post('/dashboard/become-seller/submit-for-review', [SellerOnboardingController::class, 'submitForReview'])->name('dashboard.become-seller.submit-for-review');
 
-    Route::get('/dashboard/become-shipper', [ShipperOnboardingController::class, 'show'])->name('dashboard.become-shipper');
-    Route::post('/dashboard/become-shipper', [ShipperOnboardingController::class, 'register'])->name('dashboard.become-shipper.register');
+        Route::get('/dashboard/become-shipper', [ShipperOnboardingController::class, 'show'])->name('dashboard.become-shipper');
+        Route::post('/dashboard/become-shipper', [ShipperOnboardingController::class, 'register'])->name('dashboard.become-shipper.register');
+    });
 
     // TDD §6.4 rule 4: seller.scope keeps every query here confined to
     // the acting seller's own rows, same guarantee as the API.

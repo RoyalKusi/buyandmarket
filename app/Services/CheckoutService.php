@@ -29,6 +29,15 @@ class CheckoutService
     {
         $this->assertCartIsPurchasable($cart);
 
+        // Production Readiness Report condition #3: email verification.
+        // Only gates authenticated checkout — guest checkout (TDD §5.9)
+        // has no account to verify and must remain unaffected.
+        if ($user !== null && ! $user->hasVerifiedEmail()) {
+            throw ValidationException::withMessages([
+                'email' => 'Please verify your email address before checking out. Check your inbox for a verification link.',
+            ]);
+        }
+
         return CheckoutSession::create([
             'cart_id' => $cart->id,
             'user_id' => $user?->id,

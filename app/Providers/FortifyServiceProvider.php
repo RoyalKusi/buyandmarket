@@ -47,6 +47,12 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::twoFactorChallengeView('auth.two-factor-challenge');
         Fortify::confirmPasswordView('auth.confirm-password');
 
+        // Production Readiness Report condition #3: email verification
+        // enforcement. Same class of gap as the two views above — the
+        // feature has no default view, so enabling it without one 500s
+        // the first time an unverified user is redirected here.
+        Fortify::verifyEmailView('auth.verify-email');
+
         Fortify::createUsersUsing(CreateNewUser::class);
         Fortify::updateUserProfileInformationUsing(UpdateUserProfileInformation::class);
         Fortify::updateUserPasswordsUsing(UpdateUserPassword::class);

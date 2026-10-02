@@ -3,6 +3,107 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Email verification + payment gateway connectivity diagnostic
+
+Scope: closes Production Readiness Report conditions #2 ("verify
+Pesepay/Paynow against live sandbox credentials") and #3 ("decide on/
+implement email verification").
+
+### Condition #3 — email verification, added
+
+- Enabled Laravel Fortify's `Features::emailVerification()`
+  (`config/fortify.php`). `App\Models\User` now implements
+  `Illuminate\Contracts\Auth\MustVerifyEmail` — the trait with its
+  default method implementations is already pulled in by the base
+  `Illuminate\Foundation\Auth\User` class Fortify/Laravel ships, so no
+  new trait usage was needed, only the contract.
+- `Fortify::verifyEmailView('auth.verify-email')` bound
+  (`FortifyServiceProvider`) with a new
+  `resources/views/auth/verify-email.blade.php` — same class of gap
+  already fixed for login/register/two-factor-challenge/
+  confirm-password in earlier runs: the feature has no default view,
+  so enabling it without one 500s the first time an unverified user is
+  redirected here.
+- `Event::listen(Registered::class, SendEmailVerificationNotification::
+  class)` added to `AppServiceProvider::boot()` — Laravel 11 ships no
+  `EventServiceProvider` stub, so this pairing (which auto-wires itself
+  in older Laravel skeletons) had to be registered by hand, or
+  registering would silently never send the first verification email.
+- **Checkout gate**: `CheckoutService::start()` now rejects an
+  authenticated-but-unverified user with a `ValidationException`
+  before a `CheckoutSession` is created. Deliberately scoped to the
+  single choke point both the web (`Storefront\CheckoutController::
+  start()`) and API (`Api\V1\CheckoutController::store()`) entry
+  points already call through — and deliberately conditioned on
+  `$user !== null`, so guest checkout (TDD §5.9: always allowed,
+  no account required) is completely unaffected.
+- **Seller/shipper onboarding gate**: `routes/web.php`'s
+  `dashboard.become-seller.*`/`dashboard.become-shipper.*` routes are
+  now behind the `verified` middleware (in addition to the existing
+  `auth` group). These flows collect KYC documents and payout bank
+  details — identity/financial data that should only ever be attached
+  to a confirmed-reachable email address, since that address is also
+  where KYC approval/rejection notices (`SellerKycApproved`/
+  `SellerKycRejected`, from the email-integration module above) are
+  sent. The rest of the buyer dashboard (orders, addresses, wishlist)
+  is deliberately left ungated — out of scope for this condition and
+  not something the audit flagged as a risk.
+
+### Condition #2 — payment gateway live verification, could not be done; diagnostic added instead
+
+- **Genuinely blocked, not just unattempted**: confirmed by direct
+  test that this sandbox's outbound network policy rejects the CONNECT
+  to both `api.pesepay.com` and `www.paynow.co.zw` outright (`curl`
+  against each returns `(56) CONNECT tunnel failed, response 403`), and
+  no live sandbox credentials for either gateway were provided. Live
+  verification against a real account is not achievable from this
+  environment under any approach — this is a harder constraint than
+  "missing credentials," which is why it's reported as blocked rather
+  than silently skipped.
+- **Re-reviewed both gateways' implementations** (`PesepayGateway`,
+  `PaynowGateway`) line by line against their documented integration
+  patterns (AES-256-CBC encrypted payloads for Pesepay; SHA512-hashed
+  form fields for Paynow) — both already carried an honest docblock
+  from an earlier run disclosing this exact limitation. No defects
+  found beyond what was already flagged; nothing changed in either
+  class.
+- **Added `php artisan payments:check-connectivity`**
+  (`App\Console\Commands\CheckPaymentGatewayConnectivity`): the
+  achievable substitute. Checks that each gateway's required config
+  values are present and that its base URL is actually reachable
+  (a `HEAD` request — never sends a real, unsigned payment payload).
+  Explicitly does **not** claim to verify request/response field
+  shapes; its own success message says so. Intended to be run once
+  real network access and real credentials exist, before cutover
+  (TDD §14 stage 1.9's production-configuration staging run is the
+  right place for it).
+
+### Verified against acceptance criteria
+
+- Full suite: 187 passed (607 assertions), up from 174 — 13 new tests:
+  10 for email verification (notice page renders, registration sends
+  the notification, the `Registered` → `SendEmailVerificationNotification`
+  wiring itself, a valid link verifies, an invalid-hash link is
+  rejected, unverified checkout is blocked, verified checkout
+  succeeds, unverified/verified become-seller access, guest checkout
+  is unaffected) + 3 for the connectivity-check command (missing
+  config, unreachable host, success). The 174 pre-existing tests all
+  still pass unmodified, protected by `UserFactory`'s existing default
+  of `email_verified_at => now()`.
+- `migrate:fresh` clean — no new migration needed (`email_verified_at`
+  already existed on `users`).
+- Pint clean. Production build unchanged at 38.86KB gzipped JS (no
+  frontend asset touched this run).
+
+### Remaining risk (condition #2)
+
+Both gateways' exact request/response field shapes remain unverified
+against a live account. This is a pre-launch blocking condition, not a
+code defect — it can only be closed by running
+`payments:check-connectivity` followed by one real test transaction
+per gateway, from an environment with real network access and real
+sandbox credentials for each provider, before cutover.
+
 ## Email integration — transactional notifications module
 
 Scope: closes Production Readiness Report condition #1 ("Wire up
