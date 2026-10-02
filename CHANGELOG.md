@@ -3,6 +3,83 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Mobile app groundwork — token auth, a Bearer-token bug, and the missing browse/orders/wishlist APIs
+
+Scope: the user's own informal "Phase 2" — a cross-platform Flutter
+mobile app, buyer-facing MVP, in a new `mobile/` directory of this
+repo. This is the backend half: what a mobile client needs from this
+API before any Flutter code can be written against it. (Note: some of
+this — the AuthController, the Bearer-token guard fix — was already
+pushed as PR #4 against a slightly earlier base; this branch was cut
+before that merged, so the same fixes are reapplied here rather than
+depending on PR ordering. They'll converge cleanly once both land.)
+
+### Fixed — a real, previously-undetected bug
+
+`CartController`, `CheckoutController`, and `Ai\ConversationController`
+all resolved the acting user via the bare `$request->user()` — the
+default `'web'` session guard — instead of `$request->user('sanctum')`,
+the only guard that also recognises a real `Authorization: Bearer
+<token>` request with no session cookie. Every existing test used
+`actingAs($user)`, which only populated the `'web'` guard — a genuine
+mobile client sending nothing but a bearer token was silently treated
+as a guest on every cart/checkout/AI request.
+
+- Fixed all three controllers to use `$request->user('sanctum')`.
+- `Tests\TestCase::actingAs()` overridden to authenticate both the
+  `'web'` and `'sanctum'` guards by default. Hit (and fixed) a real
+  `AuthManager` quirk along the way: `shouldUse(null)`'s fallback reads
+  `config('auth.defaults.guard')`, but `setDefaultDriver()` mutates
+  that exact same config key, so authenticating `'sanctum'` first
+  silently poisoned a later null-guard call into staying on
+  `'sanctum'` instead of `'web'`.
+- `tests/Feature/Commerce/MobileBearerTokenAuthTest.php`: drives cart
+  + checkout with a real issued Sanctum token via `withToken()` —
+  actual HTTP Authorization header, no test-only auth shortcut.
+
+### Added — mobile token-auth API
+
+`App\Http\Controllers\Api\V1\AuthController`:
+`POST /api/v1/auth/register`, `/login`, `/forgot-password`,
+`/reset-password`, and (behind `auth:sanctum`) `/logout` and `/user`.
+Wraps Fortify's own `CreateNewUser`/`ResetUserPassword` actions
+directly — a buyer's account rules never drift between web and
+mobile. `/login` mirrors Fortify's 5-per-minute rate limit; a
+two-factor-enabled account is rejected with a clear message (no
+mobile TOTP screen yet — out of scope for this buyer-facing MVP).
+10 tests in `tests/Feature/Api/MobileAuthTest.php`.
+
+### Added — the browse/orders/wishlist APIs an MVP buyer screen set actually needs
+
+The web storefront's browse/search/category pages, "my orders" page,
+and wishlist all previously existed only as web routes/Livewire
+components — a mobile client had nothing to call for a home screen, a
+search screen, order history, or a wishlist.
+
+- `GET /api/v1/products` (`ProductSearchController`): wraps
+  `App\Contracts\SearchProvider` — the same contract the web's
+  `ProductGrid` Livewire component calls — so mobile search/browse/
+  category screens share the same catalogue-visibility rules and sort
+  keys as the web, not a second, drifting implementation.
+- `GET /api/v1/orders` (`OrderController::index`): only a single-order
+  `show()` by ID existed before.
+- `GET /api/v1/wishlist`, `POST /api/v1/wishlist/{product}`
+  (`WishlistController`): wraps the existing `WishlistService`.
+- 21 tests across `ProductSearchApiTest`, `OrdersIndexApiTest`,
+  `WishlistApiTest`. Caught one real bug in my own first draft:
+  the search endpoint's `sort` validation accepted `price_asc`/
+  `price_desc`, which don't match `EloquentSearchProvider`'s actual
+  keys (`price_low_high`/`price_high_low`) — silently falling through
+  to newest-first instead of sorting by price. Added a test exercising
+  every sort key the provider recognises to catch this class of drift
+  again.
+
+### Verified
+
+- Full suite: 214 passed (697 assertions), up from 189.
+- Pint clean. `vendor/bin/phpstan analyse`: 0 errors. `migrate:fresh`
+  clean (no schema change, pure application code).
+
 ## CI: fixed the Tests (PHP 8.3) job — lockfile silently required PHP 8.4
 
 Scope: the previous fix round's own push turned up a third, independent

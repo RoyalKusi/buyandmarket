@@ -5,12 +5,14 @@ use App\Http\Controllers\Api\V1\Admin\KycReviewController;
 use App\Http\Controllers\Api\V1\Admin\ProductModerationController;
 use App\Http\Controllers\Api\V1\Admin\RoleAssignmentController;
 use App\Http\Controllers\Api\V1\Ai\ConversationController;
+use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CartController;
 use App\Http\Controllers\Api\V1\CategoryController;
 use App\Http\Controllers\Api\V1\CheckoutController;
 use App\Http\Controllers\Api\V1\KycDocumentController;
 use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\ProductController;
+use App\Http\Controllers\Api\V1\ProductSearchController;
 use App\Http\Controllers\Api\V1\Seller\BrandController as SellerBrandController;
 use App\Http\Controllers\Api\V1\Seller\DeliveryRateCardController;
 use App\Http\Controllers\Api\V1\Seller\OnboardingController as SellerOnboardingController;
@@ -20,13 +22,30 @@ use App\Http\Controllers\Api\V1\Seller\ShipmentController as SellerShipmentContr
 use App\Http\Controllers\Api\V1\Shipper\OnboardingController as ShipperOnboardingController;
 use App\Http\Controllers\Api\V1\Shipper\ShipmentController as ShipperShipmentController;
 use App\Http\Controllers\Api\V1\Webhooks\PaymentWebhookController;
+use App\Http\Controllers\Api\V1\WishlistController;
 use Illuminate\Support\Facades\Route;
 
 // TDD §7.1: base path /api/v1; breaking changes ship as /api/v2 with v1
 // maintained on a published deprecation timeline.
 Route::prefix('v1')->name('api.v1.')->group(function () {
+    // Mobile/third-party token auth — see App\Http\Controllers\Api\V1\
+    // AuthController's own class doc for why this wraps Fortify's own
+    // CreateNewUser/ResetUserPassword actions rather than duplicating them.
+    Route::prefix('auth')->name('auth.')->group(function () {
+        Route::post('/register', [AuthController::class, 'register'])->name('register');
+        Route::post('/login', [AuthController::class, 'login'])->name('login');
+        Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->name('forgot-password');
+        Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('reset-password');
+
+        Route::middleware('auth:sanctum')->group(function () {
+            Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+            Route::get('/user', [AuthController::class, 'user'])->name('user');
+        });
+    });
+
     // Public catalogue reads (TDD §7.3).
     Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index');
+    Route::get('/products', [ProductSearchController::class, 'index'])->name('products.index');
     Route::get('/products/{product}', [ProductController::class, 'show'])->name('products.show');
 
     // TDD §8.3: the signed download link itself carries its own
@@ -100,7 +119,13 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     });
 
     Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
         Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
+
+        Route::prefix('wishlist')->name('wishlist.')->group(function () {
+            Route::get('/', [WishlistController::class, 'index'])->name('index');
+            Route::post('/{product}', [WishlistController::class, 'toggle'])->name('toggle');
+        });
 
         Route::post('/admin/users/{user}/roles', [RoleAssignmentController::class, 'store'])
             ->name('admin.users.roles.store');
