@@ -5,8 +5,10 @@ namespace App\Services\Payments;
 use App\Contracts\PaymentInitiationResult;
 use App\Models\Order;
 use App\Models\Payment;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
@@ -50,10 +52,23 @@ class PaynowGateway extends AbstractPaymentGateway
         ];
         $fields['hash'] = $this->hashFields($fields);
 
-        $response = Http::asForm()->post(config('services.paynow.base_url').'/initiatetransaction', $fields);
-        $parsed = $this->parseUrlEncodedResponse($response->body());
-
         $payment = $this->recordInitiatedPayment($order, $reference);
+
+        // Second independent sweep finding (P1, reliability): same gap
+        // as PesepayGateway — a network-level failure reaching Paynow
+        // threw an uncaught ConnectionException straight through
+        // CheckoutController instead of TDD §6.6's "dedicated [failure]
+        // state, not a silent crash."
+        try {
+            $response = Http::asForm()->post(config('services.paynow.base_url').'/initiatetransaction', $fields);
+        } catch (ConnectionException $e) {
+            Log::warning('Paynow payment initiation failed to connect', ['order_id' => $order->id, 'error' => $e->getMessage()]);
+            $payment->update(['status' => 'failed']);
+
+            return new PaymentInitiationResult($payment, null, 'We could not reach Paynow right now — please try again in a moment, or choose a different payment method.');
+        }
+
+        $parsed = $this->parseUrlEncodedResponse($response->body());
 
         if (($parsed['status'] ?? null) !== 'Ok') {
             $payment->update(['status' => 'failed', 'raw_payload' => $parsed]);

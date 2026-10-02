@@ -56,7 +56,20 @@ class BuyerController extends Controller
             'is_default' => ['sometimes', 'boolean'],
         ]);
 
-        $request->user()->addresses()->create([...$data, 'is_default' => $request->boolean('is_default')]);
+        $isDefault = $request->boolean('is_default');
+
+        // Second independent sweep finding (P3, data integrity): nothing
+        // enforced "at most one default address" — a buyer could end up
+        // with several addresses simultaneously marked default. The
+        // checkout flow always has the buyer pick an address explicitly
+        // (never auto-selects "the" default), so this was a confusing
+        // display bug, not a wrong-address-used-silently risk, but it's
+        // still a real invariant worth keeping.
+        if ($isDefault) {
+            $request->user()->addresses()->update(['is_default' => false]);
+        }
+
+        $request->user()->addresses()->create([...$data, 'is_default' => $isDefault]);
 
         return back()->with('status', 'Address saved.');
     }

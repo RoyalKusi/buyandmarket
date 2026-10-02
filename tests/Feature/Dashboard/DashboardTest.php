@@ -75,6 +75,27 @@ class DashboardTest extends TestCase
         $this->assertDatabaseMissing('addresses', ['id' => $address->id]);
     }
 
+    public function test_marking_a_new_address_as_default_unsets_the_previous_default(): void
+    {
+        $buyer = User::factory()->withRole('buyer')->create();
+
+        $this->actingAs($buyer)->post('/dashboard/addresses', [
+            'label' => 'Home', 'recipient_name' => 'Tinashe Moyo', 'phone' => '0771234567',
+            'province' => 'Harare', 'city' => 'Harare', 'street_address' => '12 Sample Ave',
+            'is_default' => '1',
+        ]);
+
+        $this->actingAs($buyer)->post('/dashboard/addresses', [
+            'label' => 'Work', 'recipient_name' => 'Tinashe Moyo', 'phone' => '0771234567',
+            'province' => 'Harare', 'city' => 'Harare', 'street_address' => '45 Office Park',
+            'is_default' => '1',
+        ]);
+
+        $this->assertSame(1, Address::where('user_id', $buyer->id)->where('is_default', true)->count());
+        $this->assertDatabaseHas('addresses', ['label' => 'Work', 'is_default' => true]);
+        $this->assertDatabaseHas('addresses', ['label' => 'Home', 'is_default' => false]);
+    }
+
     public function test_a_buyer_cannot_view_another_buyers_order(): void
     {
         $buyer = User::factory()->withRole('buyer')->create();

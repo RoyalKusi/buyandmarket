@@ -115,9 +115,24 @@ class AssistantService
      * only method that ever actually executes one, and only after the
      * buyer has explicitly confirmed the pending message.
      */
+    /**
+     * Second independent sweep finding (P1): the pending-confirmation
+     * check used to run on the caller's in-memory $pending object,
+     * outside any lock, before the transaction even opened — two
+     * near-simultaneous confirm calls (a double-click, a retried
+     * request) could both read requires_confirmation=true/confirmed=
+     * false and both go on to execute the state-changing tool, e.g.
+     * adding an item to the cart twice from a single buyer
+     * confirmation. Fixed the same way as the equivalent race in
+     * OrderService::cancelUnpaidOrder found in this audit's first
+     * sweep: a locked re-read and a conditional UPDATE whose affected-
+     * row count is checked before any tool executes, both inside the
+     * transaction — the second of two racing callers now always finds
+     * 0 rows affected and is rejected instead of re-executing the tool.
+     */
     public function confirmAction(ConversationMessage $pending): ConversationMessage
     {
-        if (! $pending->requires_confirmation || $pending->confirmed) {
+        if (! $pending->requires_confirmation) {
             throw ValidationException::withMessages(['message' => 'Nothing pending confirmation on this message.']);
         }
 
@@ -125,7 +140,15 @@ class AssistantService
         $call = $pending->tool_calls[0];
 
         return DB::transaction(function () use ($pending, $conversation, $call) {
-            $pending->update(['confirmed' => true]);
+            ConversationMessage::whereKey($pending->id)->lockForUpdate()->first();
+
+            $confirmedNow = ConversationMessage::whereKey($pending->id)
+                ->where('confirmed', false)
+                ->update(['confirmed' => true]);
+
+            if ($confirmedNow === 0) {
+                throw ValidationException::withMessages(['message' => 'Nothing pending confirmation on this message.']);
+            }
 
             $this->executeAndRecordTool($conversation, $pending->conversation->user, $call);
 

@@ -5,9 +5,11 @@ namespace App\Services\Payments;
 use App\Contracts\PaymentInitiationResult;
 use App\Models\Order;
 use App\Models\Payment;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
@@ -47,14 +49,31 @@ class PesepayGateway extends AbstractPaymentGateway
             'merchantReference' => $reference,
         ];
 
-        $response = Http::withHeaders([
-            'Authorization' => config('services.pesepay.integration_key'),
-            'Content-Type' => 'application/json',
-        ])->post(config('services.pesepay.base_url').'/payments/initiate', [
-            'payload' => $this->encrypt($payload),
-        ]);
-
         $payment = $this->recordInitiatedPayment($order, $reference);
+
+        // Second independent sweep finding (P1, reliability): a network-
+        // level failure reaching Pesepay (timeout, DNS, connection
+        // refused — an entirely expected, routine occurrence for any
+        // external API, not an edge case) threw an uncaught
+        // ConnectionException straight through CheckoutController,
+        // producing a raw 500 instead of TDD §6.6's own "payment failure
+        // recovery: dedicated state, not a silent crash." This reuses
+        // the exact same graceful-decline path already used when the
+        // gateway responds but rejects the payment.
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => config('services.pesepay.integration_key'),
+                'Content-Type' => 'application/json',
+            ])->post(config('services.pesepay.base_url').'/payments/initiate', [
+                'payload' => $this->encrypt($payload),
+            ]);
+        } catch (ConnectionException $e) {
+            Log::warning('Pesepay payment initiation failed to connect', ['order_id' => $order->id, 'error' => $e->getMessage()]);
+            $payment->update(['status' => 'failed']);
+
+            return new PaymentInitiationResult($payment, null, 'We could not reach Pesepay right now — please try again in a moment, or choose a different payment method.');
+        }
+
         $decrypted = $this->decryptResponse($response);
 
         if (! ($decrypted['success'] ?? false)) {
