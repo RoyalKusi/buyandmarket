@@ -3,6 +3,101 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Comprehensive web + mobile QA pass — one site-wide web bug, three mobile bugs
+
+Scope: a full visual and functional check of both the storefront and
+the Flutter app against a live, seeded local instance (real browser via
+Playwright/Chromium for web; Flutter's web target, used only as a
+sandbox-friendly way to visually drive the app with no Android/iOS
+emulator available — not a shipped platform). All four bugs below were
+invisible to the existing automated test suites: three are pure
+browser/client runtime issues no PHPUnit HTTP test can see, and the
+fourth is an API response-shape gap nothing had asserted on before.
+
+### Fixed — web storefront: every click on every page threw a JS error
+
+`resources/js/app.js` imported and manually called `Alpine.start()` on
+top of Livewire v3's own bundled, auto-started Alpine (the one
+`@livewireScripts` provides, with the `$wire` magic every Livewire
+Alpine directive needs). Two competing Alpine instances raced to claim
+each `x-data` element; whichever lost bound without `$wire`. The
+header's live search box (`search-suggestions.blade.php`'s
+`@click.outside="$wire.close()"`) reliably lost, so **any click
+anywhere on any page** threw `$wire is not defined` in the console —
+live search-as-you-type was completely unusable, silently. Fixed by
+removing the duplicate Alpine import/start (Livewire's shared instance
+already covers the plain, non-Livewire `x-data` elsewhere in the app,
+which is the supported way to mix the two) and dropping the now-unused
+`alpinejs` package dependency. Verified before/after with a headless
+Chromium click-anywhere repro on the home, category, and product
+pages; confirmed the search dropdown and its click-outside close both
+now work. Built JS bundle shrank 107KB → 51KB, consistent with a whole
+second framework copy being removed.
+
+### Fixed — two missing eager-loads broke real mobile screens
+
+- `Api\V1\CartController::show()` loaded `items.variant.product` but
+  never `.store` — `CartItem.product.store` was always null on the
+  Flutter side. The checkout screen groups cart items by store to
+  render one delivery-method picker per seller; with the grouping
+  always empty, the delivery step rendered blank and "Continue to
+  payment" slipped past a client-side guard (comparing two now-equal
+  empty counts) straight into a 422 from `setDelivery()`. Fixed by
+  loading `items.variant.product.store`; added
+  `tests/Feature/Api/CartShowApiTest.php`.
+- `Api\V1\ProductController::show()` loaded `variants, category,
+  brand` but never `store` — the mobile product detail screen's
+  "Harare Tech Store" seller line silently disappeared. Fixed by
+  adding `store` to the load; added
+  `tests/Feature/Api/ProductShowApiTest.php`.
+
+### Fixed — mobile: login redirect landed on Home instead of the gated page
+
+`routerProvider` (`mobile/lib/core/router/app_router.dart`) did
+`ref.watch(authProvider)` at the top of its builder *and* wired a
+`refreshListenable` for the same auth changes — belt-and-suspenders
+that actively fought itself. The `watch` made the whole provider (and
+therefore the whole `GoRouter` instance) get torn down and rebuilt on
+every login/logout, snapping navigation back to `initialLocation`
+('/') mid-flight. A buyer bounced to `/login?redirect=/cart` who then
+signed in landed on Home, not Cart — the redirect value was correct,
+it just never got the chance to apply before the router under it was
+replaced. Fixed by reading auth state fresh inside `redirect` instead
+(`ref.read`), leaving `refreshListenable` as the sole trigger for
+re-running that callback without recreating the router.
+
+### Fixed — mobile: the cart silently went stale across login/logout
+
+`CartNotifier` fetched the cart once at app boot and otherwise only
+refreshed itself after its own `addItem`/`updateQuantity`/`removeItem`
+calls — nothing told it the *acting user* had changed. A buyer who
+logged in with existing cart contents saw "Your cart is empty" (the
+pre-login guest-cart snapshot) until some unrelated cart mutation
+happened to trigger a refresh. Fixed by having `CartNotifier` listen
+for `authProvider` status changes and refresh on each one, the same
+pattern already used for the router.
+
+### Verified
+
+- Backend: full suite 224 passed (722 assertions, up from 222/717).
+  Pint clean. `vendor/bin/phpstan analyse`: 0 errors.
+- Web: manually walked home, category, product, search, login,
+  register, cart drawer, and the full 3-step checkout (address →
+  delivery → payment, with the backend's own delivery-rate-card data)
+  as both guest and an authenticated buyer — all render correctly and
+  function end-to-end, including the dual-handle price slider and
+  live search.
+- Mobile: `flutter analyze` clean, `flutter test` passing. Walked the
+  same buyer journey (browse → search → login → cart → full checkout
+  stepper reaching a real Pesepay/Paynow payment-method screen with a
+  correct order total) against the live local backend.
+- Known, pre-existing, documented limitation (unchanged by this pass):
+  self-hosted Space Grotesk/Inter/JetBrains Mono WOFF2 files were
+  never added to `public/fonts/`, so both the web app and
+  `google_fonts` on mobile fall back to system fonts — flagged in
+  `resources/css/app.css`'s own comment since before this session,
+  not a regression.
+
 ## Phase 2: the Flutter mobile app — buyer-facing MVP
 
 Scope: the user's own informal "Phase 2" — a cross-platform mobile

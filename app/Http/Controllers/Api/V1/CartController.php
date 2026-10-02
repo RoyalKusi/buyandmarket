@@ -15,7 +15,7 @@ class CartController extends Controller
     {
         $cart = $cartService->getOrCreateCart($request->user('sanctum'), $request->session()->getId());
 
-        return response()->json(['data' => $cart->load('items.variant.product')]);
+        return response()->json(['data' => $cart->load('items.variant.product.store')]);
     }
 
     public function storeItem(Request $request, CartService $cartService): JsonResponse
