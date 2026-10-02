@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AddressController;
 use App\Http\Controllers\Api\V1\Admin\BrandModerationController;
 use App\Http\Controllers\Api\V1\Admin\KycReviewController;
 use App\Http\Controllers\Api\V1\Admin\ProductModerationController;
@@ -12,6 +13,7 @@ use App\Http\Controllers\Api\V1\CheckoutController;
 use App\Http\Controllers\Api\V1\KycDocumentController;
 use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\ProductController;
+use App\Http\Controllers\Api\V1\ProductSearchController;
 use App\Http\Controllers\Api\V1\Seller\BrandController as SellerBrandController;
 use App\Http\Controllers\Api\V1\Seller\DeliveryRateCardController;
 use App\Http\Controllers\Api\V1\Seller\OnboardingController as SellerOnboardingController;
@@ -20,7 +22,9 @@ use App\Http\Controllers\Api\V1\Seller\ProductImageController as SellerProductIm
 use App\Http\Controllers\Api\V1\Seller\ShipmentController as SellerShipmentController;
 use App\Http\Controllers\Api\V1\Shipper\OnboardingController as ShipperOnboardingController;
 use App\Http\Controllers\Api\V1\Shipper\ShipmentController as ShipperShipmentController;
+use App\Http\Controllers\Api\V1\StoreDeliveryRateCardController;
 use App\Http\Controllers\Api\V1\Webhooks\PaymentWebhookController;
+use App\Http\Controllers\Api\V1\WishlistController;
 use Illuminate\Support\Facades\Route;
 
 // TDD §7.1: base path /api/v1; breaking changes ship as /api/v2 with v1
@@ -43,7 +47,9 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
     // Public catalogue reads (TDD §7.3).
     Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index');
+    Route::get('/products', [ProductSearchController::class, 'index'])->name('products.index');
     Route::get('/products/{product}', [ProductController::class, 'show'])->name('products.show');
+    Route::get('/stores/{store}/delivery-rate-cards', [StoreDeliveryRateCardController::class, 'index'])->name('stores.delivery-rate-cards.index');
 
     // TDD §8.3: the signed download link itself carries its own
     // authorization (time-limited, single-document) — it is deliberately
@@ -116,7 +122,19 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     });
 
     Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
         Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
+
+        Route::prefix('wishlist')->name('wishlist.')->group(function () {
+            Route::get('/', [WishlistController::class, 'index'])->name('index');
+            Route::post('/{product}', [WishlistController::class, 'toggle'])->name('toggle');
+        });
+
+        Route::prefix('addresses')->name('addresses.')->group(function () {
+            Route::get('/', [AddressController::class, 'index'])->name('index');
+            Route::post('/', [AddressController::class, 'store'])->name('store');
+            Route::delete('/{address}', [AddressController::class, 'destroy'])->name('destroy');
+        });
 
         Route::post('/admin/users/{user}/roles', [RoleAssignmentController::class, 'store'])
             ->name('admin.users.roles.store');

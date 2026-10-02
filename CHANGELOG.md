@@ -3,83 +3,158 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
-## Mobile app groundwork — token auth + a real Bearer-token correctness bug
+## Phase 2: the Flutter mobile app — buyer-facing MVP
 
-Scope: the user's own informal "Phase 2" (distinct from README.md's
-Roadmap section) — a cross-platform Flutter mobile app, buyer-facing
-MVP, in a new separate repository. This is the backend half: what a
-mobile client needs from this API before any Flutter code can be
-written against it.
+Scope: the user's own informal "Phase 2" — a cross-platform mobile
+app for buyers, living in `mobile/` as a Flutter project inside this
+same repo (a separate GitHub repo was the original plan, but this
+session's GitHub App install can't create new repositories under the
+account — `mobile/` was the fallback). Buyer-facing only, per the
+chosen MVP scope: auth, browse/search/categories, product detail,
+cart, checkout (Pesepay/Paynow), order history, wishlist. Seller/
+shipper/admin tools and the AI assistant stay web-only.
 
-### Fixed — a real, previously-undetected bug
+### Added — two more backend gaps the UI surfaced
 
-`App\Http\Controllers\Api\V1\CartController`, `CheckoutController`, and
-`Ai\ConversationController` all resolved the acting user via the bare
-`$request->user()` — the default `'web'` session guard — instead of
-`$request->user('sanctum')`, the only guard that also recognises a
-real `Authorization: Bearer <token>` request with no session cookie.
-Every existing test for these endpoints used `actingAs($user)`, which
-only ever populated the `'web'` guard — real token transmission was
-never exercised, so a genuine mobile client sending nothing but a
-bearer token was silently treated as a guest on every cart/checkout/AI
-request. Found while reasoning through what a Flutter client would
-actually need to work, not by any test catching it.
+- `App\Http\Controllers\Api\V1\AddressController`
+  (`GET`/`POST /api/v1/addresses`, `DELETE /api/v1/addresses/{address}`):
+  the web dashboard's address book had no API equivalent — a mobile
+  buyer could pick an existing address by ID during checkout
+  (`CheckoutController::setAddress`) but had no way to add one in the
+  first place. Same validation and "at most one default" invariant as
+  the web form. 5 tests in `tests/Feature/Api/AddressApiTest.php`.
+- `App\Http\Controllers\Api\V1\StoreDeliveryRateCardController`
+  (`GET /api/v1/stores/{store}/delivery-rate-cards`): the web
+  checkout's delivery step resolves a store's rate cards server-side
+  to render as radio options
+  (`Storefront\CheckoutController::showDelivery()`) — nothing exposed
+  that lookup over JSON, leaving a mobile buyer no way to see what
+  delivery methods/fees a store actually offers before submitting a
+  selection to `CheckoutController::setDelivery()`. Public/guest-
+  accessible, like `/products`, since guest checkout needs it too.
+  3 tests in `tests/Feature/Api/StoreDeliveryRateCardApiTest.php`.
 
-- All three controllers now call `$request->user('sanctum')`.
-- `Tests\TestCase::actingAs()` overridden to authenticate both the
-  `'web'` and `'sanctum'` guards by default (explicit-guard calls are
-  untouched) — making every existing `actingAs()` call site mean what
-  it already assumed, without editing dozens of individual tests.
-  Hit (and fixed) a real `AuthManager` quirk along the way:
-  `shouldUse(null)`'s fallback reads `config('auth.defaults.guard')`,
-  but `setDefaultDriver()` mutates that exact same config key — so
-  authenticating `'sanctum'` first silently poisoned a later
-  null-guard call into staying on `'sanctum'` instead of returning to
-  `'web'`. Fixed by naming `'web'` explicitly rather than relying on
-  the (now unreliable) null-guard fallback.
-- New `tests/Feature/Commerce/MobileBearerTokenAuthTest.php`: drives
-  cart add, cart retrieval, and the start of checkout with a *real*
-  issued Sanctum token sent via `withToken()` — actual HTTP
-  Authorization header, no test-only auth shortcut — the thing no
-  existing test had ever done. Also covers an invalid token correctly
-  falling back to guest behaviour rather than a 500.
+### Added — the Flutter app itself
 
-### Added — mobile token-auth API
+`dio` + a hand-written `ApiClient`/`ApiException` pair for the HTTP
+layer (no generated client — the API surface is small and stable
+enough that manual `fromJson` methods beat codegen fragility risk);
+`flutter_secure_storage` for the Sanctum bearer token (a live
+credential, never `SharedPreferences`); `flutter_riverpod` for state
+(`AuthNotifier`, `CartNotifier`, plus a `Provider` per repository);
+`go_router` with an auth-aware `redirect` bouncing an unauthenticated
+visitor to `/login?redirect=...` before cart/checkout/orders/
+wishlist; `google_fonts` (Space Grotesk/Inter) and a `AppColors`/
+`AppTheme` mirrored 1:1 from the web's own Tailwind tokens, so the app
+reads as the same product rather than a reskin.
 
-- `App\Http\Controllers\Api\V1\AuthController`:
-  `POST /api/v1/auth/register`, `/login`, `/forgot-password`,
-  `/reset-password`, and (behind `auth:sanctum`) `/logout` and `/user`.
-  Wraps Fortify's own `CreateNewUser`/`ResetUserPassword` actions
-  directly rather than duplicating password-policy or role-assignment
-  logic — a buyer's account rules never drift between the web and
-  mobile signup paths.
-  - `/login` mirrors Fortify's own 5-per-minute email+IP rate limit.
-  - An account with two-factor authentication enabled is rejected with
-    a clear message rather than silently mishandled — TOTP's mandatory
-    seller/admin requirement (TDD §8.2) has no mobile screen yet, and
-    buyers (this MVP's whole scope) never have it enabled by default.
-  - `/register` fires the same `Registered` event the web form does,
-    so the already-wired verification-email listener covers mobile
-    signups too, unchanged.
-- `tests/Feature/Api/MobileAuthTest.php`: 10 tests — registration
-  (success, weak/mismatched password rejected), a freshly-issued token
-  actually authenticating a follow-up request, login (success, wrong
-  password, rate-limited after 5 attempts, 2FA account rejected),
-  logout actually revoking the token (not just returning 204), and
-  forgot/reset-password end-to-end.
+Screens: login/register, home (categories + infinite-scroll product
+grid), search (with sort), category browse, product detail (add to
+cart, toggle wishlist), cart, a single-page checkout stepper (address
+→ per-store delivery method → Pesepay/Paynow payment, opening the
+gateway's redirect URL via `url_launcher` or showing its instructions
+dialog), order history, order detail, and wishlist — all behind a
+5-tab `AppShell` bottom nav with a live cart-count badge.
+
+Known MVP gap: the browse/search API returns raw `Product` JSON with
+no image relation loaded, so product cards/detail currently show a
+placeholder icon instead of a photo — flagged here rather than
+inventing an `image_url` field the backend doesn't send.
 
 ### Verified
 
-- Full suite: 203 passed (659 assertions), up from 189 — all genuinely
-  new coverage, no existing test weakened to get there.
-- Pint clean. `vendor/bin/phpstan analyse`: 0 errors.
-- `migrate:fresh` clean — no schema change, this is pure application
-  code.
+- Backend: full suite 222 passed (717 assertions), up from 214. Pint
+  clean. `vendor/bin/phpstan analyse`: 0 errors.
+- Flutter: `flutter analyze` — no issues. `flutter test` — 1 passed
+  (a boot smoke test; the repository-level HTTP calls are exercised
+  indirectly through the backend's own API test suite above, not
+  re-mocked here). No Android/iOS toolchain in this sandbox, so no
+  real device/emulator build was run — static analysis and the widget
+  test are what's verified here.
 
-### Next
+## Mobile app groundwork — token auth, a Bearer-token bug, and the missing browse/orders/wishlist APIs
 
-Scaffolding the Flutter app itself, in a new `buyandmarket-mobile`
-repository, against this API.
+Scope: the user's own informal "Phase 2" — a cross-platform Flutter
+mobile app, buyer-facing MVP, in a new `mobile/` directory of this
+repo. This is the backend half: what a mobile client needs from this
+API before any Flutter code can be written against it. (Note: some of
+this — the AuthController, the Bearer-token guard fix — was already
+pushed as PR #4 against a slightly earlier base; this branch was cut
+before that merged, so the same fixes are reapplied here rather than
+depending on PR ordering. They'll converge cleanly once both land.)
+
+### Fixed — a real, previously-undetected bug
+
+`CartController`, `CheckoutController`, and `Ai\ConversationController`
+all resolved the acting user via the bare `$request->user()` — the
+default `'web'` session guard — instead of `$request->user('sanctum')`,
+the only guard that also recognises a real `Authorization: Bearer
+<token>` request with no session cookie. Every existing test used
+`actingAs($user)`, which only populated the `'web'` guard — a genuine
+mobile client sending nothing but a bearer token was silently treated
+as a guest on every cart/checkout/AI request.
+
+- Fixed all three controllers to use `$request->user('sanctum')`.
+- `Tests\TestCase::actingAs()` overridden to authenticate both the
+  `'web'` and `'sanctum'` guards by default. Hit (and fixed) a real
+  `AuthManager` quirk along the way: `shouldUse(null)`'s fallback reads
+  `config('auth.defaults.guard')`, but `setDefaultDriver()` mutates
+  that exact same config key, so authenticating `'sanctum'` first
+  silently poisoned a later null-guard call into staying on
+  `'sanctum'` instead of `'web'`.
+- `tests/Feature/Commerce/MobileBearerTokenAuthTest.php`: drives cart
+  + checkout with a real issued Sanctum token via `withToken()` —
+  actual HTTP Authorization header, no test-only auth shortcut.
+
+### Added — mobile token-auth API
+
+`App\Http\Controllers\Api\V1\AuthController`:
+`POST /api/v1/auth/register`, `/login`, `/forgot-password`,
+`/reset-password`, and (behind `auth:sanctum`) `/logout` and `/user`.
+Wraps Fortify's own `CreateNewUser`/`ResetUserPassword` actions
+directly — a buyer's account rules never drift between web and
+mobile. `/login` mirrors Fortify's 5-per-minute rate limit; a
+two-factor-enabled account is rejected with a clear message (no
+mobile TOTP screen yet — out of scope for this buyer-facing MVP).
+10 tests in `tests/Feature/Api/MobileAuthTest.php`.
+
+### Added — the browse/orders/wishlist APIs an MVP buyer screen set actually needs
+
+The web storefront's browse/search/category pages, "my orders" page,
+and wishlist all previously existed only as web routes/Livewire
+components — a mobile client had nothing to call for a home screen, a
+search screen, order history, or a wishlist.
+
+- `GET /api/v1/products` (`ProductSearchController`): wraps
+  `App\Contracts\SearchProvider` — the same contract the web's
+  `ProductGrid` Livewire component calls — so mobile search/browse/
+  category screens share the same catalogue-visibility rules and sort
+  keys as the web, not a second, drifting implementation.
+- `GET /api/v1/orders` (`OrderController::index`): only a single-order
+  `show()` by ID existed before.
+- `GET /api/v1/wishlist`, `POST /api/v1/wishlist/{product}`
+  (`WishlistController`): wraps the existing `WishlistService`.
+- 21 tests across `ProductSearchApiTest`, `OrdersIndexApiTest`,
+  `WishlistApiTest`. Caught one real bug in my own first draft:
+  the search endpoint's `sort` validation accepted `price_asc`/
+  `price_desc`, which don't match `EloquentSearchProvider`'s actual
+  keys (`price_low_high`/`price_high_low`) — silently falling through
+  to newest-first instead of sorting by price. Added a test exercising
+  every sort key the provider recognises to catch this class of drift
+  again.
+
+### Verified
+
+- Full suite: 214 passed (697 assertions), up from 189.
+- Pint clean. `vendor/bin/phpstan analyse`: 0 errors. `migrate:fresh`
+  clean (no schema change, pure application code).
+
+(Note: PR RoyalKusi/buyandmarket#4 shipped a narrower, independently
+written slice of this same Bearer-token fix and auth API — cut from an
+earlier base before this branch existed — and has since merged into
+`main`. Both changes are functionally identical on the overlapping
+files, so merging this branch is a no-op there; the entry it added for
+that work is superseded by this one and isn't repeated here.)
 
 ## CI: fixed the Tests (PHP 8.3) job — lockfile silently required PHP 8.4
 
