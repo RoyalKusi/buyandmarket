@@ -41,6 +41,7 @@
                         <a href="{{ route('seller.dashboard.products') }}" class="block rounded-sm px-3 py-2 {{ $active === 'seller.products' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Products</a>
                         <a href="{{ route('seller.dashboard.orders') }}" class="block rounded-sm px-3 py-2 {{ $active === 'seller.orders' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Orders</a>
                         <a href="{{ route('seller.dashboard.delivery') }}" class="block rounded-sm px-3 py-2 {{ $active === 'seller.delivery' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Delivery</a>
+                        <a href="{{ route('seller.dashboard.sponsored-campaigns') }}" class="block rounded-sm px-3 py-2 {{ $active === 'seller.sponsored' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Sponsored campaigns</a>
                     </div>
                 @else
                     <div>
@@ -65,6 +66,7 @@
                         <a href="{{ route('admin.dashboard.sellers') }}" class="block rounded-sm px-3 py-2 {{ $active === 'admin.sellers' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Seller approvals</a>
                         <a href="{{ route('admin.dashboard.products') }}" class="block rounded-sm px-3 py-2 {{ $active === 'admin.products' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Product moderation</a>
                         <a href="{{ route('admin.dashboard.reviews') }}" class="block rounded-sm px-3 py-2 {{ $active === 'admin.reviews' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Reviews</a>
+                        <a href="{{ route('admin.dashboard.sponsored-campaigns') }}" class="block rounded-sm px-3 py-2 {{ $active === 'admin.sponsored' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Sponsored campaigns</a>
                         <a href="{{ route('admin.dashboard.audit-log') }}" class="block rounded-sm px-3 py-2 {{ $active === 'admin.audit' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Audit log</a>
                         <a href="{{ route('admin.dashboard.ai-monitoring') }}" class="block rounded-sm px-3 py-2 {{ $active === 'admin.ai' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">AI monitoring</a>
                     </div>

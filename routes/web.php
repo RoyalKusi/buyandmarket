@@ -105,6 +105,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/order-groups/{orderGroup}/shipment', [SellerController::class, 'assignShipment'])->name('orders.shipment');
         Route::get('/delivery', [SellerController::class, 'delivery'])->name('delivery');
         Route::post('/delivery', [SellerController::class, 'storeRateCard'])->name('delivery.store');
+        Route::get('/sponsored-campaigns', [SellerController::class, 'sponsoredCampaigns'])->name('sponsored-campaigns');
+        Route::post('/sponsored-campaigns', [SellerController::class, 'storeSponsoredCampaign'])->name('sponsored-campaigns.store');
     });
 
     Route::prefix('shipper/dashboard')->name('shipper.dashboard.')->group(function () {
@@ -122,6 +124,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/products/{product}/reject', [AdminController::class, 'rejectProduct'])->name('products.reject');
         Route::get('/reviews', [AdminController::class, 'reviews'])->name('reviews');
         Route::post('/reviews/{review}/remove', [AdminController::class, 'removeReview'])->name('reviews.remove');
+        Route::get('/sponsored-campaigns', [AdminController::class, 'sponsoredCampaigns'])->name('sponsored-campaigns');
+        Route::post('/sponsored-campaigns/{campaign}/approve', [AdminController::class, 'approveSponsoredCampaign'])->name('sponsored-campaigns.approve');
+        Route::post('/sponsored-campaigns/{campaign}/reject', [AdminController::class, 'rejectSponsoredCampaign'])->name('sponsored-campaigns.reject');
         Route::get('/audit-log', [AdminController::class, 'auditLog'])->name('audit-log');
         Route::get('/ai-monitoring', [AdminController::class, 'aiMonitoring'])->name('ai-monitoring');
     });

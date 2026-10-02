@@ -75,6 +75,14 @@ class Seller extends Model
         return $this->hasMany(SellerBadge::class);
     }
 
+    /**
+     * @return HasMany<SponsoredCampaign, $this>
+     */
+    public function sponsoredCampaigns(): HasMany
+    {
+        return $this->hasMany(SponsoredCampaign::class);
+    }
+
     public function isActive(): bool
     {
         return $this->status === 'active';

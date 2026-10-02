@@ -9,9 +9,11 @@ use App\Models\ConversationMessage;
 use App\Models\Product;
 use App\Models\Review;
 use App\Models\Seller;
+use App\Models\SponsoredCampaign;
 use App\Services\KycReviewService;
 use App\Services\ProductService;
 use App\Services\ReviewService;
+use App\Services\SponsoredCampaignService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -116,6 +118,34 @@ class AdminController extends Controller
         $reviewService->remove($review, $request->user(), $data['reason_code']);
 
         return back()->with('status', 'Review removed.');
+    }
+
+    /**
+     * TDD module 15: sponsored campaigns awaiting a decision.
+     */
+    public function sponsoredCampaigns(): View
+    {
+        return view('dashboard.admin.sponsored-campaigns', [
+            'campaigns' => SponsoredCampaign::where('status', 'pending')->with('product', 'seller')->get(),
+        ]);
+    }
+
+    public function approveSponsoredCampaign(Request $request, SponsoredCampaign $campaign, SponsoredCampaignService $campaignService): RedirectResponse
+    {
+        $this->authorize('approve', $campaign);
+
+        $campaignService->approve($campaign, $request->user());
+
+        return back()->with('status', 'Campaign approved.');
+    }
+
+    public function rejectSponsoredCampaign(Request $request, SponsoredCampaign $campaign, SponsoredCampaignService $campaignService): RedirectResponse
+    {
+        $this->authorize('reject', $campaign);
+
+        $campaignService->reject($campaign, $request->user());
+
+        return back()->with('status', 'Campaign rejected.');
     }
 
     public function auditLog(Request $request): View

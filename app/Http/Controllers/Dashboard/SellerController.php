@@ -11,11 +11,13 @@ use App\Models\OrderGroup;
 use App\Models\Product;
 use App\Models\ProductImage;
 use App\Models\ProductVariant;
+use App\Models\SponsoredCampaign;
 use App\Services\Ai\ListingAssistant;
 use App\Services\BrandService;
 use App\Services\ProductImageService;
 use App\Services\ProductService;
 use App\Services\ShippingService;
+use App\Services\SponsoredCampaignService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -342,5 +344,35 @@ class SellerController extends Controller
         );
 
         return back()->with('status', 'Delivery rate saved.');
+    }
+
+    /**
+     * TDD module 15: sponsored placements — deferred since Run 1.4
+     * (named alongside the homepage's sponsored block). Seller-
+     * submitted, admin-approved; see App\Services\SponsoredCampaignService.
+     */
+    public function sponsoredCampaigns(Request $request): View
+    {
+        return view('dashboard.seller.sponsored-campaigns', [
+            'campaigns' => $request->user()->seller->sponsoredCampaigns()->with('product')->latest()->get(),
+            'products' => Product::query()->where('status', 'published')->get(),
+        ]);
+    }
+
+    public function storeSponsoredCampaign(Request $request, SponsoredCampaignService $campaignService): RedirectResponse
+    {
+        $this->authorize('create', SponsoredCampaign::class);
+
+        $data = $request->validate([
+            'product_id' => ['required', 'exists:products,id'],
+            'daily_budget' => ['required', 'numeric', 'min:1'],
+            'starts_at' => ['required', 'date', 'after_or_equal:today'],
+            'ends_at' => ['nullable', 'date', 'after:starts_at'],
+        ]);
+
+        $product = Product::findOrFail($data['product_id']);
+        $campaignService->create($request->user()->seller, $product, $data['daily_budget'], $data['starts_at'], $data['ends_at'] ?? null);
+
+        return back()->with('status', 'Campaign submitted for admin approval.');
     }
 }

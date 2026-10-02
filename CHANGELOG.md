@@ -3,6 +3,59 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Run 1.20 — Sponsored placements
+
+Scope: continuing the deferred-item pass. TDD module 15, named
+alongside the homepage's sponsored block (flagged deferred since Run
+1.4) and the AI-monitoring panel's "ad/sponsored-product
+recommendations" line (flagged since Run 1.11).
+
+### Added
+
+- **`sponsored_campaigns` table + `App\Models\SponsoredCampaign`**:
+  seller-submitted, admin-approved — same moderation shape as brand
+  suggestions (module 11). `daily_budget` is declarative only; no
+  billing/invoicing is wired to it (flagged below), same honest-gap
+  pattern as every other payment-adjacent feature this sandbox has no
+  live gateway to verify against.
+- **`App\Services\SponsoredCampaignService`**: `create()` (validates the
+  product belongs to the seller and is published before accepting a
+  campaign), `approve()`/`reject()` (admin-only, audit-logged), and
+  `placementsFor()` — re-checks the product is *still* published at
+  render time rather than trusting the campaign's own stored status
+  (the same "never trust embedded state" discipline docs/adr/0006
+  already applies to RAG retrieval).
+- **Seller dashboard**: `/seller/dashboard/sponsored-campaigns` —
+  submit a campaign for one of the seller's own published products,
+  see pending/active/rejected status.
+- **Admin**: `/admin/dashboard/sponsored-campaigns` — approve/reject
+  worklist.
+- **Homepage**: a labeled "Sponsored" rail, randomly drawn from active
+  campaigns.
+
+### Verified against acceptance criteria
+
+- Full suite: 135 passed (462 assertions) — new coverage: a seller can
+  submit a campaign for their own published product, cannot submit one
+  for an unpublished product, admin approval/audit log, the approved
+  campaign actually renders on the homepage, and a seller cannot
+  approve their own campaign.
+- Pint: clean. `migrate:fresh`: clean. Production build: 38.86KB
+  gzipped JS, unchanged.
+
+### Deferred / flagged (still open)
+
+- **No billing/invoicing for sponsored campaigns** — `daily_budget` is
+  recorded but never charged. A real implementation needs the same
+  payment-gateway integration this build's other money-movement already
+  has no live sandbox to verify against (Pesepay/Paynow).
+- **Placement selection is uniform-random among active campaigns**, not
+  a real auction (bid amount, pacing, frequency capping) — TDD module 15
+  doesn't specify an auction mechanism, so this is the simplest honest
+  implementation, not a cut corner.
+- Analytics-dependent seller insights (views/conversion, sales
+  summaries) — unchanged, still blocked on the missing event stream.
+
 ## Run 1.19 — Recommendations: related, recently-viewed, picked-for-you
 
 Scope: continuing the deferred-item pass. TDD §6.1/module 40's three

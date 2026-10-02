@@ -19,6 +19,20 @@
             </section>
         @endif
 
+        @if ($sponsoredPlacements->isNotEmpty())
+            <section aria-labelledby="sponsored-heading">
+                <h2 id="sponsored-heading" class="text-heading-lg text-slate-900 mb-4">Sponsored</h2>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    @foreach ($sponsoredPlacements as $placement)
+                        <div class="relative">
+                            <span class="absolute top-2 left-2 z-10 inline-flex items-center rounded-xs px-2 py-1 text-caption bg-slate-900/80 text-slate-0">Sponsored</span>
+                            <x-product-tile :product="$placement->product" />
+                        </div>
+                    @endforeach
+                </div>
+            </section>
+        @endif
+
         <section aria-labelledby="categories-heading">
             <h2 id="categories-heading" class="text-heading-lg text-slate-900 mb-4">Shop by category</h2>
 
