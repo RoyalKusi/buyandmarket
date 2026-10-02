@@ -70,6 +70,7 @@ class PesepayGateway extends AbstractPaymentGateway
         } catch (ConnectionException $e) {
             Log::warning('Pesepay payment initiation failed to connect', ['order_id' => $order->id, 'error' => $e->getMessage()]);
             $payment->update(['status' => 'failed']);
+            $this->markInitiationFailed($payment);
 
             return new PaymentInitiationResult($payment, null, 'We could not reach Pesepay right now — please try again in a moment, or choose a different payment method.');
         }
@@ -78,6 +79,7 @@ class PesepayGateway extends AbstractPaymentGateway
 
         if (! ($decrypted['success'] ?? false)) {
             $payment->update(['status' => 'failed', 'raw_payload' => $decrypted]);
+            $this->markInitiationFailed($payment);
 
             return new PaymentInitiationResult($payment, null, $decrypted['message'] ?? 'Pesepay declined to initiate this payment.');
         }

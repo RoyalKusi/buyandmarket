@@ -7,6 +7,7 @@ use App\Models\CheckoutSession;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Services\CheckoutService;
+use App\Services\NotificationMailer;
 use App\Services\OrderService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -24,6 +25,7 @@ abstract class AbstractPaymentGateway implements PaymentGateway
     public function __construct(
         protected readonly OrderService $orderService,
         protected readonly CheckoutService $checkoutService,
+        protected readonly NotificationMailer $notificationMailer,
     ) {}
 
     /**
@@ -48,6 +50,20 @@ abstract class AbstractPaymentGateway implements PaymentGateway
             'amount' => $order->total,
             'status' => 'initiated',
         ]);
+    }
+
+    /**
+     * Found while testing the notification module: a gateway that
+     * declines synchronously (responds immediately with a rejection, or
+     * fails to connect at all — initiate()'s own catch blocks) never
+     * reaches applyWebhookResult()'s 'failed' branch, so
+     * CheckoutService::markPaymentFailed()'s email there never fires for
+     * this path. This is the equivalent for the synchronous case, kept
+     * here rather than duplicated in each gateway.
+     */
+    protected function markInitiationFailed(Payment $payment): void
+    {
+        $this->notificationMailer->paymentFailed($payment->order);
     }
 
     /**

@@ -22,6 +22,7 @@ class CheckoutService
     public function __construct(
         private readonly OrderService $orderService,
         private readonly PaymentGatewayManager $gateways,
+        private readonly NotificationMailer $notificationMailer,
     ) {}
 
     public function start(Cart $cart, ?User $user, ?string $guestEmail = null, ?string $guestPhone = null): CheckoutSession
@@ -94,6 +95,14 @@ class CheckoutService
         // the session's remaining TTL, so retry requires only
         // re-attempting payment." Nothing here is cleared.
         $session->update(['status' => 'payment_failed']);
+
+        // Production Readiness Report condition #1: covers the buyer who
+        // closed the tab before retrying, so a failed payment is never
+        // silently abandoned — the in-app pending/failed page already
+        // covers the buyer still on the site.
+        if ($session->order !== null) {
+            $this->notificationMailer->paymentFailed($session->order);
+        }
 
         return $session;
     }

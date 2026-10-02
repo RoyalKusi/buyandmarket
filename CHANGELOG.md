@@ -3,6 +3,74 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Email integration — transactional notifications module
+
+Scope: closes Production Readiness Report condition #1 ("Wire up
+transactional notifications — at minimum order confirmation and
+payment-failure emails"). An in-code module (`App\Services\
+NotificationMailer`), not a third-party email API integration — it
+sends through Laravel's own `Mail` facade, which already supports SMTP
+via `.env` (`MAIL_MAILER`, default `log` until a real transport is
+configured).
+
+### Added
+
+- **`App\Services\NotificationMailer`**: the single module every
+  outbound transactional email routes through. Two rules apply
+  uniformly: (1) a mail failure is caught and logged, never thrown —
+  a broken SMTP credential must never roll back an admin's KYC
+  approval or an order confirmation; call sites invoke it after their
+  own `DB::transaction()` commits, since the email is a side effect of
+  a state change that already durably happened. (2) Sent synchronously,
+  not queued (`ShouldQueue`) — this launch topology has no queue
+  worker guaranteed running (the same reasoning already documented for
+  the image pipeline and `ai:reindex`), so a queued mail would sit in
+  the `jobs` table forever rather than degrade gracefully.
+- **Six Mailables** (`App\Mail\*`), each a Markdown template using
+  Laravel's built-in mail components (no new asset pipeline):
+  `OrderConfirmed`, `PaymentFailed`, `SellerKycApproved`,
+  `SellerKycRejected`, `ProductApproved`, `ProductRejected`.
+- **Wired into six real state transitions**: `OrderService::
+  confirmPaidOrder()` (order confirmed), `CheckoutService::
+  markPaymentFailed()` and both payment gateways' synchronous-decline
+  and connection-failure branches (payment failed — covers both the
+  async webhook path and the sync "gateway declined immediately" path,
+  which previously had no notification at all), `KycReviewService::
+  approve()`/`reject()` (seller KYC decision), `ProductService::
+  approve()`/`reject()` (product moderation decision).
+- Guest orders resolve to `guest_email`; a guest order with no email on
+  file (phone-only, per TDD §6.2's "phone or email required, not both")
+  is silently skipped, not an error.
+
+### Verified against acceptance criteria
+
+- Full suite: 174 passed (585 assertions), up from 162 — 12 new tests
+  covering every wired trigger, guest-email fallback, no-resend-on-
+  redelivered-webhook idempotency, and that a mail failure never breaks
+  the underlying business transaction.
+- A dedicated test actually renders all six Markdown templates (not
+  just asserts the right Mailable class was dispatched, which
+  `Mail::fake()` alone can't catch) against representative data and
+  checks real content appears — order number, product title, total.
+- Manually rendered `SellerKycApproved` end-to-end against a fresh
+  SQLite database outside the test harness; clean HTML output with
+  correct interpolated content.
+- Pint clean. `migrate:fresh` clean. Production build unchanged at
+  38.86KB gzipped JS (Markdown mail templates ship no frontend JS).
+
+### Deferred / flagged (still open)
+
+- No notification preferences / unsubscribe mechanism — every
+  transactional email here is a required account/order notification,
+  not marketing, so this follows the same pattern most transactional
+  mail takes; flagged as a future consideration if non-transactional
+  email is ever added.
+- SMS notifications (named in the Production Readiness Report alongside
+  email) remain unimplemented — no SMS gateway is configured anywhere
+  in this build.
+- Condition #3 from the report (email verification enforcement) is a
+  separate, not-yet-addressed gap.
+
 ## Production readiness audit — corrective sweeps 1 & 2
 
 Scope: a full-application audit (functionality, security, data

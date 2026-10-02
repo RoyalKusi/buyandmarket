@@ -22,6 +22,7 @@ class ProductService
         private readonly InventoryService $inventoryService,
         private readonly AuditLogger $auditLogger,
         private readonly SellerOnboardingService $sellerOnboardingService,
+        private readonly NotificationMailer $notificationMailer,
     ) {}
 
     /**
@@ -127,7 +128,7 @@ class ProductService
             ]);
         }
 
-        return DB::transaction(function () use ($product, $admin) {
+        $product = DB::transaction(function () use ($product, $admin) {
             $before = $product->only(['status']);
             $product->update(['status' => 'published']);
 
@@ -141,6 +142,10 @@ class ProductService
 
             return $product;
         });
+
+        $this->notificationMailer->productApproved($product);
+
+        return $product;
     }
 
     /**
@@ -153,7 +158,7 @@ class ProductService
     {
         $this->assertStatus($product, 'pending_review');
 
-        return DB::transaction(function () use ($product, $admin, $reasonCode, $note) {
+        $product = DB::transaction(function () use ($product, $admin, $reasonCode, $note) {
             $before = $product->only(['status']);
             $product->update(['status' => 'draft']);
 
@@ -167,6 +172,10 @@ class ProductService
 
             return $product;
         });
+
+        $this->notificationMailer->productRejected($product, $reasonCode, $note);
+
+        return $product;
     }
 
     public function archive(Product $product, User $actor): Product

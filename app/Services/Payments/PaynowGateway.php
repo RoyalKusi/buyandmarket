@@ -64,6 +64,7 @@ class PaynowGateway extends AbstractPaymentGateway
         } catch (ConnectionException $e) {
             Log::warning('Paynow payment initiation failed to connect', ['order_id' => $order->id, 'error' => $e->getMessage()]);
             $payment->update(['status' => 'failed']);
+            $this->markInitiationFailed($payment);
 
             return new PaymentInitiationResult($payment, null, 'We could not reach Paynow right now — please try again in a moment, or choose a different payment method.');
         }
@@ -72,6 +73,7 @@ class PaynowGateway extends AbstractPaymentGateway
 
         if (($parsed['status'] ?? null) !== 'Ok') {
             $payment->update(['status' => 'failed', 'raw_payload' => $parsed]);
+            $this->markInitiationFailed($payment);
 
             return new PaymentInitiationResult($payment, null, $parsed['error'] ?? 'Paynow declined to initiate this payment.');
         }

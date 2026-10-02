@@ -3,6 +3,7 @@
 namespace Tests\Feature\Commerce;
 
 use App\Models\Address;
+use App\Models\CheckoutSession;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Seller;
@@ -29,7 +30,7 @@ class PaymentGatewayConnectionFailureTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function checkoutReadyForPayment(): \App\Models\CheckoutSession
+    private function checkoutReadyForPayment(): CheckoutSession
     {
         $buyer = User::factory()->withRole('buyer')->create();
         $address = Address::factory()->for($buyer)->create();

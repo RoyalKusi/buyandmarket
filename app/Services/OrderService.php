@@ -20,6 +20,7 @@ class OrderService
         private readonly CommissionService $commissionService,
         private readonly AuditLogger $auditLogger,
         private readonly AnalyticsService $analyticsService,
+        private readonly NotificationMailer $notificationMailer,
     ) {}
 
     public function createFromCheckoutSession(CheckoutSession $session): Order
@@ -133,7 +134,7 @@ class OrderService
         // signal — fired on actual payment confirmation (not at
         // checkout-session creation, when the purchase could still fail)
         // so seller sales summaries never count an order that never paid.
-        $order->load('orderGroups.items.variant.product');
+        $order->load('orderGroups.items.variant.product', 'user');
         foreach ($order->orderGroups as $orderGroup) {
             foreach ($orderGroup->items as $item) {
                 $this->analyticsService->record('order_placed', $item->variant->product, $order->user, [
@@ -142,6 +143,10 @@ class OrderService
                 ]);
             }
         }
+
+        // Production Readiness Report condition #1: the buyer's durable,
+        // off-platform confirmation that payment succeeded.
+        $this->notificationMailer->orderConfirmed($order);
     }
 
     /**

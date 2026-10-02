@@ -22,13 +22,16 @@ use Illuminate\Validation\ValidationException;
  */
 class KycReviewService
 {
-    public function __construct(private readonly AuditLogger $auditLogger) {}
+    public function __construct(
+        private readonly AuditLogger $auditLogger,
+        private readonly NotificationMailer $notificationMailer,
+    ) {}
 
     public function approve(Seller $seller, User $admin): Seller
     {
         $this->assertUnderReview($seller);
 
-        return DB::transaction(function () use ($seller, $admin) {
+        $seller = DB::transaction(function () use ($seller, $admin) {
             KycReview::create([
                 'seller_id' => $seller->id,
                 'reviewer_id' => $admin->id,
@@ -52,13 +55,17 @@ class KycReviewService
 
             return $seller;
         });
+
+        $this->notificationMailer->sellerKycApproved($seller);
+
+        return $seller;
     }
 
     public function reject(Seller $seller, User $admin, string $reasonCode, ?string $note = null): Seller
     {
         $this->assertUnderReview($seller);
 
-        return DB::transaction(function () use ($seller, $admin, $reasonCode, $note) {
+        $seller = DB::transaction(function () use ($seller, $admin, $reasonCode, $note) {
             KycReview::create([
                 'seller_id' => $seller->id,
                 'reviewer_id' => $admin->id,
@@ -88,6 +95,10 @@ class KycReviewService
 
             return $seller;
         });
+
+        $this->notificationMailer->sellerKycRejected($seller, $reasonCode, $note);
+
+        return $seller;
     }
 
     private function assertUnderReview(Seller $seller): void
