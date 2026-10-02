@@ -19,7 +19,7 @@ class CartServiceTest extends TestCase
     {
         $variant = ProductVariant::factory()->for(
             Product::factory()->published()->create(['base_price' => '10.00'])
-        )->create(['price_override' => null]);
+        )->create(['price_override' => null, 'stock_quantity' => 10]);
         $cart = Cart::factory()->create();
 
         $service = app(CartService::class);

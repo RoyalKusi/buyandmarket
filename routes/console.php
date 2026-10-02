@@ -13,3 +13,8 @@ Schedule::command('inventory:reconcile')->dailyAt('02:00');
 
 // TDD §3.1 module 6: badges are recalculated nightly, not assigned manually.
 Schedule::command('sellers:recompute-badges')->dailyAt('02:30');
+
+// Production-audit finding (P1): abandoned pending orders held their
+// reserved stock forever with nothing ever releasing it — see
+// App\Console\Commands\CancelAbandonedOrders.
+Schedule::command('orders:cancel-abandoned')->hourly();

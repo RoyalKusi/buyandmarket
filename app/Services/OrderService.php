@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\CheckoutSession;
 use App\Models\Order;
+use App\Models\ProductVariant;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -60,6 +61,26 @@ class OrderService
                 ]);
 
                 foreach ($items as $item) {
+                    // Audit finding (P1, overselling race): $item->variant
+                    // was loaded minutes earlier (checkout can sit through
+                    // address/delivery selection before payment), and
+                    // Cart::itemsGroupedByStore() never re-validates it.
+                    // Re-fetch with a row lock, inside this same
+                    // transaction, and re-check stock right before
+                    // reserving it — this both closes the stale-read gap
+                    // and serializes concurrent buyers racing for the same
+                    // last unit (the second transaction blocks on the
+                    // lock, then sees the first buyer's decrement).
+                    $lockedVariant = ProductVariant::whereKey($item->variant_id)->lockForUpdate()->first();
+
+                    if ($lockedVariant === null || $lockedVariant->stock_quantity < $item->quantity) {
+                        $available = $lockedVariant->stock_quantity ?? 0;
+
+                        throw ValidationException::withMessages([
+                            'cart' => "Only {$available} of \"{$item->variant->product->title}\" left in stock — please update your cart.",
+                        ]);
+                    }
+
                     $orderItem = $orderGroup->items()->create([
                         'variant_id' => $item->variant_id,
                         'quantity' => $item->quantity,
@@ -71,7 +92,7 @@ class OrderService
                     // Reserve stock at order creation, before payment
                     // confirms, so two buyers can't both check out the
                     // last unit while the first is still paying.
-                    $this->inventoryService->adjustStock($item->variant, -$item->quantity, 'sale', $orderItem->id);
+                    $this->inventoryService->adjustStock($lockedVariant, -$item->quantity, 'sale', $orderItem->id);
                 }
 
                 $this->commissionService->recordForOrderGroup($orderGroup);
@@ -127,22 +148,44 @@ class OrderService
      * Reverses stock reservation for an order that never completed
      * payment (TDD §5.9: checkout_sessions retain state through
      * PaymentFailed, but an abandoned order's reserved stock must not be
-     * held indefinitely).
+     * held indefinitely). Audit finding (P1): this method existed but was
+     * never called from anywhere — no scheduled job released stock for
+     * abandoned checkouts, so a buyer who started payment and never
+     * finished it (closed the tab, a webhook was never delivered) held
+     * that stock reserved forever. See App\Console\Commands\
+     * CancelAbandonedOrders, scheduled hourly (routes/console.php).
+     *
+     * Also fixes a TOCTOU race in the pre-fix version: the pending-status
+     * check and the cancellation were two separate steps, so two
+     * concurrent callers (e.g. a slow webhook arriving at the same moment
+     * the scheduled sweep runs) could both pass the check and both
+     * restore stock — double-crediting inventory that was only ever
+     * reserved once. The status check now happens inside the same
+     * transaction as a locked read, and the update is conditioned on
+     * still being 'pending' with its affected-row count checked before
+     * any stock is touched.
      */
     public function cancelUnpaidOrder(Order $order): void
     {
-        if ($order->status !== 'pending') {
-            return;
-        }
-
         DB::transaction(function () use ($order) {
+            $locked = Order::whereKey($order->id)->lockForUpdate()->first();
+
+            if ($locked === null || $locked->status !== 'pending') {
+                return;
+            }
+
+            $cancelled = Order::whereKey($order->id)->where('status', 'pending')->update(['status' => 'cancelled']);
+
+            if ($cancelled === 0) {
+                return;
+            }
+
             foreach ($order->orderGroups as $orderGroup) {
                 foreach ($orderGroup->items as $item) {
                     $this->inventoryService->adjustStock($item->variant, $item->quantity, 'order_cancelled', $item->id);
                 }
             }
 
-            $order->update(['status' => 'cancelled']);
             $order->orderGroups()->update(['status' => 'cancelled']);
         });
     }

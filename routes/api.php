@@ -82,6 +82,16 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         // TDD §5.9/§7.3: the assistant is available to guests too (same
         // session-identified pattern as the guest cart above), not
         // gated behind auth:sanctum.
+        //
+        // Audit finding (P2, cost-abuse): every message/confirm call is
+        // a real paid LlmProvider call (messages.store also triggers
+        // EmbeddingProvider retrieval) with no limit anywhere, reachable
+        // by a guest. The actual fix lives inside App\Services\Ai\
+        // AssistantService::sendMessage() itself, not as route
+        // middleware here — that's the one choke point both this API
+        // route and the dashboard's Livewire AiAssistant component
+        // funnel through, so a route-only throttle would have left the
+        // Livewire path, which most buyers actually use, unprotected.
         Route::prefix('ai/conversations')->name('ai.conversations.')->group(function () {
             Route::post('/', [ConversationController::class, 'store'])->name('store');
             Route::post('/{conversation}/messages', [ConversationController::class, 'storeMessage'])->name('messages.store');

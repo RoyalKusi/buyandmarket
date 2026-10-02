@@ -37,7 +37,26 @@ class CartService
 
         $item = DB::transaction(function () use ($cart, $variant, $quantity) {
             $item = $cart->items()->firstOrNew(['variant_id' => $variant->id]);
-            $item->quantity = ($item->exists ? $item->quantity : 0) + $quantity;
+            $requestedQuantity = ($item->exists ? $item->quantity : 0) + $quantity;
+
+            // Audit finding (P2): neither this nor updateQuantity()
+            // capped quantity against real stock — the HTML `min`/`max`
+            // attributes on the quantity input are client-side only, and
+            // a Livewire request can set the bound property to any
+            // value directly. The financial invariant was already safe
+            // (CheckoutService::assertCartIsPurchasable and
+            // OrderService::createFromCheckoutSession both re-validate
+            // stock before any money moves), but an unbounded cart
+            // quantity is still bad input hygiene — it risks integer
+            // overflow on the DB column and a confusing, late failure
+            // instead of an immediate, clear one.
+            if ($requestedQuantity > $variant->stock_quantity) {
+                throw ValidationException::withMessages([
+                    'quantity' => "Only {$variant->stock_quantity} of \"{$variant->product->title}\" available.",
+                ]);
+            }
+
+            $item->quantity = $requestedQuantity;
             // Snapshot at add-time (TDD §3.4 module 17); re-validated
             // against the live price at checkout (CheckoutService).
             $item->price_snapshot = $variant->price();
@@ -59,6 +78,12 @@ class CartService
             $item->delete();
 
             return $item;
+        }
+
+        if ($quantity > $item->variant->stock_quantity) {
+            throw ValidationException::withMessages([
+                'quantity' => "Only {$item->variant->stock_quantity} of \"{$item->variant->product->title}\" available.",
+            ]);
         }
 
         $item->update(['quantity' => $quantity]);

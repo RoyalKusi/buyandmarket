@@ -11,6 +11,7 @@ use App\Services\AuditLogger;
 use App\Services\CartService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -23,6 +24,16 @@ use Illuminate\Validation\ValidationException;
 class AssistantService
 {
     private const MAX_TOOL_ROUNDS = 4;
+
+    /**
+     * Audit finding (P2, cost-abuse): every sendMessage() call is a real
+     * paid LlmProvider call (usually paired with an EmbeddingProvider
+     * retrieval call) — this limit covers both the API route
+     * (routes/api.php, throttled there too for defense in depth) and
+     * the dashboard's Livewire AiAssistant component, which call
+     * sendMessage() as their one shared choke point.
+     */
+    private const MESSAGES_PER_MINUTE = 20;
 
     /** @var list<array{name: string, description: string, parameters: array}> */
     private const TOOLS = [
@@ -75,8 +86,23 @@ class AssistantService
         ]);
     }
 
+    /**
+     * Keyed by the conversation's own owner (user id, or session id for
+     * a guest) rather than the current request, since this method is
+     * called from a Livewire action context too, not just an HTTP route.
+     */
     public function sendMessage(Conversation $conversation, string $content): ConversationMessage
     {
+        $throttleKey = 'ai-assistant:'.($conversation->user_id ?? $conversation->session_id ?? $conversation->id);
+
+        if (RateLimiter::tooManyAttempts($throttleKey, self::MESSAGES_PER_MINUTE)) {
+            throw ValidationException::withMessages([
+                'message' => 'You are sending messages too quickly — please wait a moment and try again.',
+            ]);
+        }
+
+        RateLimiter::hit($throttleKey, 60);
+
         $conversation->messages()->create(['role' => 'user', 'content' => $content]);
 
         $grounding = $this->retrieval->search($content);

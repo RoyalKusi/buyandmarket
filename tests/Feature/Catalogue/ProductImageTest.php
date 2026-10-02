@@ -141,6 +141,42 @@ class ProductImageTest extends TestCase
         $this->assertSame('A black portable Bluetooth speaker.', $image->fresh()->alt_text);
     }
 
+    /**
+     * Audit finding (P2, resource-exhaustion): nothing capped pixel
+     * dimensions before GD decoded an upload in generateVariants() — a
+     * small file can still decompress to an enormous canvas ("pixel
+     * flood"), exhausting a PHP worker's memory. This proves a
+     * 49-megapixel image (well under the 10MB size limit, since it's a
+     * single flat colour and compresses hard) is rejected by the cheap
+     * getimagesize() check alone, before any GD decode function runs.
+     */
+    public function test_an_image_over_the_megapixel_cap_is_rejected_before_gd_ever_decodes_it(): void
+    {
+        $seller = Seller::factory()->active()->create();
+        $product = Product::factory()->for($seller->store)->create();
+
+        $gdImage = imagecreatetruecolor(8000, 7000); // 56 megapixels
+        imagefilledrectangle($gdImage, 0, 0, 7999, 6999, imagecolorallocate($gdImage, 10, 20, 30));
+        $tmpPath = tempnam(sys_get_temp_dir(), 'huge').'.jpg';
+        imagejpeg($gdImage, $tmpPath, 60);
+        imagedestroy($gdImage);
+
+        $file = new UploadedFile($tmpPath, 'huge.jpg', 'image/jpeg', null, true);
+
+        $response = $this->actingAs($seller->user)->post("/api/v1/seller/products/{$product->id}/images", [
+            'image' => $file,
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.status', 'rejected');
+
+        $image = ProductImage::firstOrFail();
+        $this->assertStringContainsString('resolution', $image->rejection_reason);
+        Storage::disk('public')->assertMissing($image->variantPath('large'));
+
+        @unlink($tmpPath);
+    }
+
     private function enableTwoFactor($user): void
     {
         $user->forceFill(['two_factor_secret' => encrypt('x'), 'two_factor_confirmed_at' => now()])->save();

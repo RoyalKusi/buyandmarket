@@ -32,6 +32,22 @@ class ProductImageService
 
     private const MAX_SIZE_BYTES = 10 * 1024 * 1024;
 
+    /**
+     * Audit finding (P2, resource-exhaustion): nothing capped the pixel
+     * dimensions of an upload before it reached GD's decode functions
+     * (imagecreatefromjpeg/png/webp) in generateVariants(). A small file
+     * (well under MAX_SIZE_BYTES) can still decompress to an enormous
+     * canvas — GD allocates an uncompressed bitmap buffer sized
+     * width*height*4 bytes, so a crafted "pixel flood" image could
+     * exhaust a PHP worker's memory limit. 40 megapixels comfortably
+     * covers any real product photo (a 45MP professional camera's native
+     * resolution) while rejecting anything built to be disproportionate
+     * to its file size. Checked against getimagesize()'s cheap,
+     * header-only read — this rejection always happens before the
+     * expensive decode, never after.
+     */
+    private const MAX_MEGAPIXELS = 40_000_000;
+
     private const THUMB_DIMENSION = 300;
 
     private const LARGE_MAX_DIMENSION = 1600;
@@ -121,6 +137,10 @@ class ProductImageService
                 'Image is %dx%dpx — the minimum is %dx%dpx.',
                 $width, $height, self::MIN_WIDTH, self::MIN_HEIGHT,
             );
+        }
+
+        if ($width * $height > self::MAX_MEGAPIXELS) {
+            return 'Image resolution is too high to process — resize it before uploading.';
         }
 
         $longest = max($width, $height);

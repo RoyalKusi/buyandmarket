@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureTwoFactorEnabled;
 use App\Http\Middleware\EnsureUserHasRole;
 use App\Http\Middleware\ScopeQueriesToActingSeller;
+use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Application;
@@ -23,6 +24,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // and shares the same /api/v1 authorization codepath as Bearer-token
         // clients (mobile, third-party integrations).
         $middleware->statefulApi();
+
+        // Production-audit hardening: baseline security response headers
+        // on every response (web and API alike).
+        $middleware->append(SecurityHeaders::class);
 
         $middleware->alias([
             'seller.scope' => ScopeQueriesToActingSeller::class,

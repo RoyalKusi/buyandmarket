@@ -25,6 +25,7 @@
         <label for="quantity" class="text-body-md text-slate-700">Qty</label>
         <input id="quantity" type="number" min="1" wire:model="quantity" class="w-20 h-10 rounded-sm border border-slate-200 px-3 text-body-md">
     </div>
+    @error('quantity') <p class="mb-4 -mt-2 text-body-sm text-red-600">{{ $message }}</p> @enderror
 
     <div class="flex flex-col gap-2">
         <button type="button" wire:click="addToCart" class="h-12 rounded-sm border border-blue-600 text-blue-600 text-button font-semibold hover:bg-blue-50">
