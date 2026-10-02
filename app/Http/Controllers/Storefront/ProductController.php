@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Storefront;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Services\AnalyticsService;
 use App\Services\RecentlyViewedService;
 use App\Services\RecommendationService;
 use App\Services\ReviewService;
@@ -23,6 +24,7 @@ class ProductController extends Controller
         ReviewService $reviewService,
         RecommendationService $recommendationService,
         RecentlyViewedService $recentlyViewedService,
+        AnalyticsService $analyticsService,
     ): View {
         $this->authorize('view', $product);
 
@@ -37,6 +39,7 @@ class ProductController extends Controller
 
         $recentlyViewed = $recentlyViewedService->recentlyViewed(excluding: $product);
         $recentlyViewedService->record($product);
+        $analyticsService->record('product_view', $product, Auth::user());
 
         return view('storefront.product', [
             'product' => $product,

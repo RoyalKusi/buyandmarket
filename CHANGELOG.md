@@ -3,6 +3,72 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Run 1.22 — Analytics event stream + seller sales summaries/performance insights
+
+Scope: continuing the deferred-item pass — the last item on the
+standing deferred list. TDD module 41 (analytics event stream), named
+since Run 1.7/1.11's CHANGELOG as the prerequisite for seller sales
+summaries, performance insights, and views/conversion signals.
+
+### Added
+
+- **`analytics_events` table + `App\Models\AnalyticsEvent`**: append-
+  only, like `audit_logs`, but a behavioural signal (what buyers did),
+  not a privileged-mutation record — kept as a separate table rather
+  than overloading `audit_logs`' meaning. Three event types:
+  `product_view`, `add_to_cart`, `order_placed`.
+- **`App\Services\AnalyticsService::record()`**: fire-and-forget on the
+  request thread (no queue worker guaranteed running on this launch
+  topology, same reasoning as the image pipeline and `ai:reindex`).
+  Wired into `ProductController::show()` (product_view),
+  `CartService::addItem()` (add_to_cart), and `OrderService::
+  confirmPaidOrder()` (order_placed — fired on actual payment
+  confirmation, not at checkout-session creation, so a sales summary
+  never counts an order that never paid).
+- **`App\Services\SellerAnalyticsService`**: read-only aggregates over
+  the event stream — `salesSummary()` (30-day daily revenue from real
+  `order_placed` events) and `productPerformance()` (views, purchases,
+  conversion rate per product). Never writes.
+- **Seller overview dashboard**: a 30-day revenue bar chart and a
+  product performance table (views/purchases/conversion %), replacing
+  the "needs the analytics event stream" deferred note.
+
+### Verified against acceptance criteria
+
+- Full suite: 144 passed (478 assertions) — new coverage: viewing a
+  product records a `product_view` event, adding to cart records
+  `add_to_cart`, the seller overview shows real views/conversion and a
+  real revenue total from recorded events, and one seller's events never
+  leak into another seller's summary.
+- Pint: clean. `migrate:fresh`: clean. Production build: 38.86KB
+  gzipped JS, unchanged — the revenue chart is server-rendered CSS bars,
+  no charting library added.
+
+### Deferred / flagged (still open)
+
+- **Inventory alerts stay a plain stock threshold**, not a sales-
+  velocity reorder point — TDD §5.6 frames inventory alerts and
+  performance insights together, but computing a reorder point from
+  velocity is a meaningfully larger forecasting feature than this run's
+  scope, even with the event stream now available to feed it.
+- **AI-monitoring's per-tool latency and grounding-failure rate**
+  (flagged since Run 1.11) remain out of scope — this event stream
+  tracks buyer behaviour, not AI-call instrumentation, a different
+  signal entirely.
+- No cross-seller/platform-wide analytics dashboard for admins — this
+  run's aggregates are scoped to "a seller's own products," matching
+  what TDD §5.6 actually asks for.
+
+This closes every item on the "Deferred / flagged (still open)" list
+carried since Run 1.14 (audit-log filtering, self-service web forms,
+product-creation form, image pipeline, categorization suggestions,
+reviews, wishlists, recommendations, sponsored placements, search-as-
+you-type, price slider, analytics). Remaining gaps are either newly
+surfaced by this pass itself (see each run's own "Deferred" section
+above) or explicitly out of this build's stated scope (stages 1.9-1.10:
+legacy data migration and DNS cutover, which need real production data
+and hosting this sandbox doesn't have).
+
 ## Run 1.21 — Search-as-you-type + dual-handle price slider
 
 Scope: continuing the deferred-item pass. Two Design System §6.2 pieces

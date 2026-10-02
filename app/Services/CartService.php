@@ -16,6 +16,8 @@ use Illuminate\Validation\ValidationException;
  */
 class CartService
 {
+    public function __construct(private readonly AnalyticsService $analyticsService) {}
+
     public function getOrCreateCart(?User $user, ?string $sessionId): Cart
     {
         if ($user !== null) {
@@ -33,7 +35,7 @@ class CartService
             ]);
         }
 
-        return DB::transaction(function () use ($cart, $variant, $quantity) {
+        $item = DB::transaction(function () use ($cart, $variant, $quantity) {
             $item = $cart->items()->firstOrNew(['variant_id' => $variant->id]);
             $item->quantity = ($item->exists ? $item->quantity : 0) + $quantity;
             // Snapshot at add-time (TDD §3.4 module 17); re-validated
@@ -43,6 +45,12 @@ class CartService
 
             return $item;
         });
+
+        // TDD module 41: the analytics event stream, flagged deferred
+        // since Run 1.7/1.11 — this is its "add_to_cart" signal.
+        $this->analyticsService->record('add_to_cart', $variant->product, $cart->user, ['quantity' => $quantity]);
+
+        return $item;
     }
 
     public function updateQuantity(CartItem $item, int $quantity): CartItem

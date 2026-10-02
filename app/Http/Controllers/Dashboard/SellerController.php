@@ -16,6 +16,7 @@ use App\Services\Ai\ListingAssistant;
 use App\Services\BrandService;
 use App\Services\ProductImageService;
 use App\Services\ProductService;
+use App\Services\SellerAnalyticsService;
 use App\Services\ShippingService;
 use App\Services\SponsoredCampaignService;
 use Illuminate\Http\JsonResponse;
@@ -30,7 +31,7 @@ use Illuminate\View\View;
  */
 class SellerController extends Controller
 {
-    public function overview(Request $request): View
+    public function overview(Request $request, SellerAnalyticsService $sellerAnalyticsService): View
     {
         $seller = $request->user()->seller;
 
@@ -41,17 +42,22 @@ class SellerController extends Controller
             'revenue' => $orderGroups->whereIn('status', ['completed'])->sum(fn ($g) => (float) $g->subtotal),
             'pendingCommission' => $orderGroups->whereNotIn('status', ['cancelled', 'refunded'])->sum(fn ($g) => (float) $g->commission_amount),
             'statusCounts' => $orderGroups->countBy('status'),
-            // TDD §5.6 "inventory alerts": low-stock/reorder-point
-            // suggestions from sales velocity — this run has no
-            // analytics event stream (module 41) to compute velocity
-            // from, so it's a plain stock-quantity threshold instead,
-            // deterministic rather than AI-generated (flagged in
-            // CHANGELOG.md).
+            // TDD §5.6 "inventory alerts": a plain stock-quantity
+            // threshold, deterministic rather than AI-generated (the
+            // analytics event stream now exists as of Run 1.22, but
+            // reorder-point-from-velocity is a larger forecasting
+            // feature than this threshold — flagged in CHANGELOG.md).
             'lowStockVariants' => ProductVariant::query()
                 ->whereHas('product', fn ($q) => $q->where('status', 'published'))
                 ->where('stock_quantity', '<=', 5)
                 ->with('product')
                 ->get(),
+            // TDD module 41 / §5.6 "sales summaries, performance
+            // insights" — flagged deferred since Run 1.7/1.11, wired in
+            // Run 1.22 once the analytics event stream existed to
+            // compute them from honestly.
+            'salesSummary' => $sellerAnalyticsService->salesSummary($seller),
+            'productPerformance' => $sellerAnalyticsService->productPerformance($seller),
         ]);
     }
 

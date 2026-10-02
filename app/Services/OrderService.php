@@ -18,6 +18,7 @@ class OrderService
         private readonly InventoryService $inventoryService,
         private readonly CommissionService $commissionService,
         private readonly AuditLogger $auditLogger,
+        private readonly AnalyticsService $analyticsService,
     ) {}
 
     public function createFromCheckoutSession(CheckoutSession $session): Order
@@ -106,6 +107,20 @@ class OrderService
                 after: ['status' => 'confirmed'],
             );
         });
+
+        // TDD module 41: the analytics event stream's "order_placed"
+        // signal — fired on actual payment confirmation (not at
+        // checkout-session creation, when the purchase could still fail)
+        // so seller sales summaries never count an order that never paid.
+        $order->load('orderGroups.items.variant.product');
+        foreach ($order->orderGroups as $orderGroup) {
+            foreach ($orderGroup->items as $item) {
+                $this->analyticsService->record('order_placed', $item->variant->product, $order->user, [
+                    'quantity' => $item->quantity,
+                    'revenue' => (string) $item->price_at_purchase,
+                ]);
+            }
+        }
     }
 
     /**
