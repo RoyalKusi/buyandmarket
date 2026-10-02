@@ -67,4 +67,14 @@ class ProductGridTest extends TestCase
             ->assertSee('Expensive Item')
             ->assertDontSee('Cheap Item');
     }
+
+    public function test_the_price_slider_ceiling_matches_the_highest_published_price(): void
+    {
+        $seller = Seller::factory()->active()->create();
+        Product::factory()->for($seller->store)->published()->create(['base_price' => '42.00']);
+        Product::factory()->for($seller->store)->published()->create(['base_price' => '250.00']);
+        Product::factory()->for($seller->store)->create(['base_price' => '9999.00', 'status' => 'draft']);
+
+        Livewire::test(ProductGrid::class)->assertViewHas('priceCeiling', 250);
+    }
 }

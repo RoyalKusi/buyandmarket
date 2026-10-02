@@ -3,6 +3,48 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Run 1.21 — Search-as-you-type + dual-handle price slider
+
+Scope: continuing the deferred-item pass. Two Design System §6.2 pieces
+flagged deferred since Run 1.4, both explicitly noted as waiting on
+"Alpine patterns established elsewhere in the storefront" — true as of
+Run 1.12+.
+
+### Added
+
+- **`App\Livewire\Storefront\SearchSuggestions`**: a debounced (250ms)
+  dropdown in the header search box, opening once 2+ characters are
+  typed. Reuses `App\Contracts\SearchProvider` — the exact provider the
+  results page itself queries through, so a suggestion and a real
+  search result are never out of sync. Closes on an outside click
+  (Alpine `@click.outside`); Enter still submits the native form to the
+  results page as before.
+- **Dual-handle price slider** (`resources/views/livewire/product-
+  grid.blade.php`): two overlaid native `<input type="range">` elements
+  (the standard dependency-free technique — no new JS library), paired
+  with number inputs for precise entry, both kept in sync by a small
+  Alpine component and committed to Livewire's `minPrice`/`maxPrice` via
+  `$wire.set()` on change. The slider's ceiling is the catalogue's real
+  highest published price (`ProductGrid::render()`), not a guessed
+  constant.
+
+### Verified against acceptance criteria
+
+- Full suite: 139 passed (468 assertions) — new coverage: 2+ characters
+  opens the dropdown with matching published products, 1 character
+  doesn't, an unpublished product never appears as a suggestion, and the
+  slider's ceiling matches the real highest published price.
+- Pint: clean. `migrate:fresh`: clean (no new migration this run).
+  Production build: 38.86KB gzipped JS, unchanged — both features are
+  plain Alpine, already a dependency.
+
+### Deferred / flagged (still open)
+
+- No keyboard arrow-key navigation through search suggestions (click/Tap
+  only) — a real but smaller gap than the whole feature was.
+- Analytics-dependent seller insights, the hero carousel, "Deals near
+  you," trust strip — unchanged from earlier runs' lists.
+
 ## Run 1.20 — Sponsored placements
 
 Scope: continuing the deferred-item pass. TDD module 15, named

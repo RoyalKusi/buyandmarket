@@ -27,20 +27,7 @@
             </a>
 
             <form action="{{ route('storefront.search') }}" method="GET" class="flex-1 max-w-[640px]">
-                <label for="storefront-search" class="sr-only">Search products</label>
-                <div class="relative">
-                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M21 21l-4.3-4.3m1.8-5.2a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                    <input
-                        id="storefront-search"
-                        type="search"
-                        name="q"
-                        value="{{ request('q') }}"
-                        placeholder="Search products, stores..."
-                        class="w-full h-11 rounded-full bg-slate-50 pl-11 pr-4 text-body-lg text-slate-900 placeholder:text-slate-400 border border-transparent focus:bg-slate-0 focus:border-blue-600 focus:outline-none transition-colors duration-fast"
-                    >
-                </div>
+                <livewire:storefront.search-suggestions :query="request('q', '')" />
             </form>
 
             <nav aria-label="Account" class="shrink-0 flex items-center gap-2 text-body-md">

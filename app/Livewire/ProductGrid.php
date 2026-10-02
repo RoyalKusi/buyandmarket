@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Contracts\SearchProvider;
 use App\Models\Brand;
+use App\Models\Product;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -85,9 +86,18 @@ class ProductGrid extends Component
             perPage: 24,
         );
 
+        // Design System §6.2's dual-handle price slider — flagged
+        // deferred since Run 1.4 ("better built once Alpine patterns are
+        // established elsewhere in the storefront," true as of Run
+        // 1.12+). The slider's ceiling is the catalogue's real highest
+        // price, not a guessed constant, so it stays correct as sellers
+        // list higher-priced products without a code change.
+        $priceCeiling = max((int) ceil((float) (Product::published()->max('base_price') ?? 100)), 1);
+
         return view('livewire.product-grid', [
             'results' => $results,
             'brands' => Brand::query()->where('status', 'approved')->orderBy('name')->get(),
+            'priceCeiling' => $priceCeiling,
             'activeFilterCount' => collect([$this->brandId, $this->minPrice, $this->maxPrice])
                 ->filter(fn ($value) => $value !== null && $value !== '')
                 ->count(),

@@ -2,9 +2,11 @@
     Design System §6.2: left filter rail (desktop, 280px, sticky) / a
     mobile filter drawer is deferred — this run ships the filters inline
     above the grid on every breakpoint rather than a half-built bottom
-    sheet. Price range here is two plain number inputs, not the dual-
-    handle slider (§6.2) — that's a JS-heavy component better built once
-    Alpine patterns are established elsewhere in the storefront.
+    sheet. The dual-handle price slider (§6.2), flagged deferred since
+    Run 1.4, shipped in Run 1.21 — two overlaid range inputs is the
+    standard dependency-free technique, paired with number inputs for
+    precise entry (Alpine keeps the two in sync; the Livewire
+    wire:model.live.debounce is what actually re-queries).
 --}}
 <div wire:loading.class="opacity-60" class="transition-opacity duration-fast">
     <div class="flex flex-wrap items-end gap-4 mb-6 pb-6 border-b border-slate-100">
@@ -22,14 +24,36 @@
             </select>
         </div>
 
-        <div class="flex flex-col gap-1">
-            <label for="pg-min-price" class="text-body-md text-slate-700">Min price</label>
-            <input id="pg-min-price" type="number" min="0" step="0.01" wire:model.live.debounce.400ms="minPrice" class="h-11 w-28 rounded-sm border border-slate-200 px-3 text-body-lg">
-        </div>
+        <div
+            class="flex flex-col gap-1 w-full sm:w-auto"
+            x-data="{
+                min: {{ $minPrice !== null && $minPrice !== '' ? (float) $minPrice : 0 }},
+                max: {{ $maxPrice !== null && $maxPrice !== '' ? (float) $maxPrice : $priceCeiling }},
+                ceiling: {{ $priceCeiling }},
+                clampMin() { this.min = Math.min(this.min, this.max); },
+                clampMax() { this.max = Math.max(this.max, this.min); },
+            }"
+        >
+            <label class="text-body-md text-slate-700">Price range</label>
 
-        <div class="flex flex-col gap-1">
-            <label for="pg-max-price" class="text-body-md text-slate-700">Max price</label>
-            <input id="pg-max-price" type="number" min="0" step="0.01" wire:model.live.debounce.400ms="maxPrice" class="h-11 w-28 rounded-sm border border-slate-200 px-3 text-body-lg">
+            <div class="relative h-11 w-full sm:w-64 flex items-center">
+                <div class="absolute inset-x-0 h-1 rounded-full bg-slate-200"></div>
+                <div class="absolute h-1 rounded-full bg-blue-600" :style="`left: ${(min / ceiling) * 100}%; right: ${100 - (max / ceiling) * 100}%`"></div>
+                <input type="range" min="0" :max="ceiling" step="1" x-model.number="min" @input="clampMin()"
+                    @change="$wire.set('minPrice', min)"
+                    class="absolute w-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-600 [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-blue-600 [&::-moz-range-thumb]:border-0">
+                <input type="range" min="0" :max="ceiling" step="1" x-model.number="max" @input="clampMax()"
+                    @change="$wire.set('maxPrice', max)"
+                    class="absolute w-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-600 [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-blue-600 [&::-moz-range-thumb]:border-0">
+            </div>
+
+            <div class="flex items-center gap-2 text-body-sm text-slate-600">
+                <span>$</span>
+                <input type="number" min="0" :max="ceiling" x-model.number="min" @change="clampMin(); $wire.set('minPrice', min)" class="w-16 h-8 rounded-sm border border-slate-200 px-2">
+                <span>&ndash;</span>
+                <span>$</span>
+                <input type="number" min="0" :max="ceiling" x-model.number="max" @change="clampMax(); $wire.set('maxPrice', max)" class="w-16 h-8 rounded-sm border border-slate-200 px-2">
+            </div>
         </div>
 
         <div class="flex flex-col gap-1">
