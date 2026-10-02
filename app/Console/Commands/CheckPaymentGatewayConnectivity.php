@@ -28,12 +28,10 @@ class CheckPaymentGatewayConnectivity extends Command
 
     public function handle(): int
     {
-        $allOk = true;
-
         $allOk = $this->checkGateway('pesepay', [
             'integration_key' => config('services.pesepay.integration_key'),
             'encryption_key' => config('services.pesepay.encryption_key'),
-        ], config('services.pesepay.base_url')) && $allOk;
+        ], config('services.pesepay.base_url'));
 
         $allOk = $this->checkGateway('paynow', [
             'integration_id' => config('services.paynow.integration_id'),
