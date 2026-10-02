@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\V1\Seller\ProductImageController as SellerProductIm
 use App\Http\Controllers\Api\V1\Seller\ShipmentController as SellerShipmentController;
 use App\Http\Controllers\Api\V1\Shipper\OnboardingController as ShipperOnboardingController;
 use App\Http\Controllers\Api\V1\Shipper\ShipmentController as ShipperShipmentController;
+use App\Http\Controllers\Api\V1\StoreDeliveryRateCardController;
 use App\Http\Controllers\Api\V1\Webhooks\PaymentWebhookController;
 use App\Http\Controllers\Api\V1\WishlistController;
 use Illuminate\Support\Facades\Route;
@@ -48,6 +49,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index');
     Route::get('/products', [ProductSearchController::class, 'index'])->name('products.index');
     Route::get('/products/{product}', [ProductController::class, 'show'])->name('products.show');
+    Route::get('/stores/{store}/delivery-rate-cards', [StoreDeliveryRateCardController::class, 'index'])->name('stores.delivery-rate-cards.index');
 
     // TDD §8.3: the signed download link itself carries its own
     // authorization (time-limited, single-document) — it is deliberately

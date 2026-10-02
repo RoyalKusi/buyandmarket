@@ -3,6 +3,75 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Phase 2: the Flutter mobile app — buyer-facing MVP
+
+Scope: the user's own informal "Phase 2" — a cross-platform mobile
+app for buyers, living in `mobile/` as a Flutter project inside this
+same repo (a separate GitHub repo was the original plan, but this
+session's GitHub App install can't create new repositories under the
+account — `mobile/` was the fallback). Buyer-facing only, per the
+chosen MVP scope: auth, browse/search/categories, product detail,
+cart, checkout (Pesepay/Paynow), order history, wishlist. Seller/
+shipper/admin tools and the AI assistant stay web-only.
+
+### Added — two more backend gaps the UI surfaced
+
+- `App\Http\Controllers\Api\V1\AddressController`
+  (`GET`/`POST /api/v1/addresses`, `DELETE /api/v1/addresses/{address}`):
+  the web dashboard's address book had no API equivalent — a mobile
+  buyer could pick an existing address by ID during checkout
+  (`CheckoutController::setAddress`) but had no way to add one in the
+  first place. Same validation and "at most one default" invariant as
+  the web form. 5 tests in `tests/Feature/Api/AddressApiTest.php`.
+- `App\Http\Controllers\Api\V1\StoreDeliveryRateCardController`
+  (`GET /api/v1/stores/{store}/delivery-rate-cards`): the web
+  checkout's delivery step resolves a store's rate cards server-side
+  to render as radio options
+  (`Storefront\CheckoutController::showDelivery()`) — nothing exposed
+  that lookup over JSON, leaving a mobile buyer no way to see what
+  delivery methods/fees a store actually offers before submitting a
+  selection to `CheckoutController::setDelivery()`. Public/guest-
+  accessible, like `/products`, since guest checkout needs it too.
+  3 tests in `tests/Feature/Api/StoreDeliveryRateCardApiTest.php`.
+
+### Added — the Flutter app itself
+
+`dio` + a hand-written `ApiClient`/`ApiException` pair for the HTTP
+layer (no generated client — the API surface is small and stable
+enough that manual `fromJson` methods beat codegen fragility risk);
+`flutter_secure_storage` for the Sanctum bearer token (a live
+credential, never `SharedPreferences`); `flutter_riverpod` for state
+(`AuthNotifier`, `CartNotifier`, plus a `Provider` per repository);
+`go_router` with an auth-aware `redirect` bouncing an unauthenticated
+visitor to `/login?redirect=...` before cart/checkout/orders/
+wishlist; `google_fonts` (Space Grotesk/Inter) and a `AppColors`/
+`AppTheme` mirrored 1:1 from the web's own Tailwind tokens, so the app
+reads as the same product rather than a reskin.
+
+Screens: login/register, home (categories + infinite-scroll product
+grid), search (with sort), category browse, product detail (add to
+cart, toggle wishlist), cart, a single-page checkout stepper (address
+→ per-store delivery method → Pesepay/Paynow payment, opening the
+gateway's redirect URL via `url_launcher` or showing its instructions
+dialog), order history, order detail, and wishlist — all behind a
+5-tab `AppShell` bottom nav with a live cart-count badge.
+
+Known MVP gap: the browse/search API returns raw `Product` JSON with
+no image relation loaded, so product cards/detail currently show a
+placeholder icon instead of a photo — flagged here rather than
+inventing an `image_url` field the backend doesn't send.
+
+### Verified
+
+- Backend: full suite 222 passed (717 assertions), up from 214. Pint
+  clean. `vendor/bin/phpstan analyse`: 0 errors.
+- Flutter: `flutter analyze` — no issues. `flutter test` — 1 passed
+  (a boot smoke test; the repository-level HTTP calls are exercised
+  indirectly through the backend's own API test suite above, not
+  re-mocked here). No Android/iOS toolchain in this sandbox, so no
+  real device/emulator build was run — static analysis and the widget
+  test are what's verified here.
+
 ## Mobile app groundwork — token auth, a Bearer-token bug, and the missing browse/orders/wishlist APIs
 
 Scope: the user's own informal "Phase 2" — a cross-platform Flutter
