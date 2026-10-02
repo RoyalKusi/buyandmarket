@@ -52,4 +52,20 @@ class UserFactory extends Factory
             $user->assignRole($role);
         });
     }
+
+    /**
+     * TDD §8.2: seller/admin dashboards require 2FA
+     * (App\Http\Middleware\EnsureTwoFactorEnabled) — tests that only
+     * need an already-compliant account skip the real QR/confirm flow
+     * (covered separately in tests/Feature/Auth/TwoFactorTest.php) and
+     * set the same columns Fortify's own confirm action would.
+     */
+    public function withTwoFactorEnabled(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'two_factor_secret' => encrypt('test-secret'),
+            'two_factor_recovery_codes' => encrypt(json_encode(['recovery-code-1'])),
+            'two_factor_confirmed_at' => now(),
+        ]);
+    }
 }

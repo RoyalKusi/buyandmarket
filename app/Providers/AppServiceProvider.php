@@ -2,7 +2,23 @@
 
 namespace App\Providers;
 
+use App\Contracts\Ai\EmbeddingProvider;
+use App\Contracts\Ai\LlmProvider;
+use App\Contracts\SearchProvider;
+use App\Listeners\MergeGuestCartOnLogin;
+use App\Listeners\StashSessionIdBeforeLogin;
 use App\Models\User;
+use App\Services\Ai\OpenAiCompatibleEmbeddingProvider;
+use App\Services\Ai\OpenAiCompatibleLlmProvider;
+use App\Services\Search\EloquentSearchProvider;
+use Illuminate\Auth\Events\Attempting;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Registered;
+use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
+use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Auth\Notifications\VerifyEmail;
+use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -14,7 +30,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // TDD §2.1/§13 stage 4: the only place that ever changes when the
+        // platform moves off MySQL full-text onto Meilisearch/Typesense.
+        $this->app->bind(SearchProvider::class, EloquentSearchProvider::class);
+
+        // TDD §5/§8.4: single-implementation-today, swappable-tomorrow
+        // boundary — see docs/adr/0006.
+        $this->app->bind(LlmProvider::class, OpenAiCompatibleLlmProvider::class);
+        $this->app->bind(EmbeddingProvider::class, OpenAiCompatibleEmbeddingProvider::class);
     }
 
     /**
@@ -28,6 +51,38 @@ class AppServiceProvider extends ServiceProvider
         // special-case it. Sub-admins are never covered here: their access
         // stays scoped to the admin_roles permission set on their assignment.
         Gate::before(fn (User $user, string $ability) => $user->hasRole('admin') ? true : null);
+
+        // TDD §3.4 module 17: "merged on login" (Run 1.12 fix — see
+        // App\Listeners\MergeGuestCartOnLogin's own doc comment).
+        Event::listen(Attempting::class, StashSessionIdBeforeLogin::class);
+        Event::listen(Login::class, MergeGuestCartOnLogin::class);
+
+        // Production Readiness Report condition #3: email verification.
+        // Laravel 11 has no EventServiceProvider stub (auto-discovery
+        // covers most cases, but not this pairing) — without this line,
+        // enabling Features::emailVerification() in config/fortify.php
+        // adds the verify/resend routes and the `verified` middleware
+        // check, but never actually sends the first verification email
+        // on registration.
+        Event::listen(Registered::class, SendEmailVerificationNotification::class);
+
+        // Brand-styled account emails: Laravel's own VerifyEmail/
+        // ResetPassword notifications render through the default
+        // Markdown notification theme (generic Laravel green) unless
+        // overridden here — same branded shell (App\'s resources/views/
+        // components/emails/layout.blade.php) as every transactional
+        // email NotificationMailer sends, so every email this app ever
+        // sends looks like it came from the same product.
+        VerifyEmail::toMailUsing(fn ($notifiable, string $url) => (new MailMessage)
+            ->subject('Verify your email address')
+            ->view('emails.auth.verify-email', ['url' => $url]));
+
+        ResetPassword::toMailUsing(fn ($notifiable, string $token) => (new MailMessage)
+            ->subject('Reset your password')
+            ->view('emails.auth.reset-password', [
+                'url' => url(route('password.reset', ['token' => $token, 'email' => $notifiable->getEmailForPasswordReset()], false)),
+                'expireMinutes' => (int) config('auth.passwords.'.config('auth.defaults.passwords').'.expire'),
+            ]));
 
         // TDD §8.2: minimum 10 characters, breached-password check via a
         // k-anonymity API (HaveIBeenPwned range query) at registration/reset.

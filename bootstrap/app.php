@@ -1,8 +1,16 @@
 <?php
 
+use App\Http\Middleware\EnsureTwoFactorEnabled;
+use App\Http\Middleware\EnsureUserHasRole;
+use App\Http\Middleware\ScopeQueriesToActingSeller;
+use App\Http\Middleware\SecurityHeaders;
+use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
+use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Session\Middleware\StartSession;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -16,6 +24,35 @@ return Application::configure(basePath: dirname(__DIR__))
         // and shares the same /api/v1 authorization codepath as Bearer-token
         // clients (mobile, third-party integrations).
         $middleware->statefulApi();
+
+        // Production-audit hardening: baseline security response headers
+        // on every response (web and API alike).
+        $middleware->append(SecurityHeaders::class);
+
+        $middleware->alias([
+            'seller.scope' => ScopeQueriesToActingSeller::class,
+            'role' => EnsureUserHasRole::class,
+            '2fa' => EnsureTwoFactorEnabled::class,
+        ]);
+
+        // Unconditional session support (no CSRF) for guest-cart/checkout
+        // API routes — see the comment in routes/api.php for why
+        // Sanctum's own conditional session middleware isn't enough here.
+        $middleware->appendToGroup('guest-session', [
+            EncryptCookies::class,
+            AddQueuedCookiesToResponse::class,
+            StartSession::class,
+        ]);
+
+        // TDD §8.5: "a seller's API token cannot retrieve another seller's
+        // ... even with a guessed ID (404, not 403)." That only holds if the
+        // seller-ownership scope is active before Laravel resolves a route's
+        // {product}/{variant} model binding — otherwise the binding succeeds
+        // unscoped and only the Policy check below it can deny (403).
+        $middleware->prependToPriorityList(
+            before: SubstituteBindings::class,
+            prepend: ScopeQueriesToActingSeller::class,
+        );
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

@@ -47,6 +47,30 @@ return [
             'report' => false,
         ],
 
+        // TDD §8.3: KYC documents are stored outside the public webroot,
+        // never served by a direct/guessable URL — access is only ever
+        // through a signed, time-limited URL (App\Http\Controllers\Api\V1\
+        // KycDocumentController).
+        'kyc' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/kyc'),
+            'serve' => false,
+            'throw' => false,
+            'report' => false,
+        ],
+
+        // TDD §6.11 Design System / Run 1.6: proof-of-delivery photo +
+        // signature captures, stored the same way KYC documents are
+        // (private, no direct URL) — a delivery dispute is exactly the
+        // kind of evidence that shouldn't be casually guessable/public.
+        'shipments' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/shipments'),
+            'serve' => false,
+            'throw' => false,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),
