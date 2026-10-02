@@ -3,7 +3,9 @@
 use App\Http\Controllers\Dashboard\AdminController;
 use App\Http\Controllers\Dashboard\BuyerController;
 use App\Http\Controllers\Dashboard\SellerController;
+use App\Http\Controllers\Dashboard\SellerOnboardingController;
 use App\Http\Controllers\Dashboard\ShipperController;
+use App\Http\Controllers\Dashboard\ShipperOnboardingController;
 use App\Http\Controllers\Storefront\CategoryController;
 use App\Http\Controllers\Storefront\CheckoutController;
 use App\Http\Controllers\Storefront\HomeController;
@@ -62,11 +64,27 @@ Route::middleware('auth')->group(function () {
     // two-factor routes).
     Route::view('/dashboard/security', 'dashboard.security')->middleware('password.confirm')->name('dashboard.security');
 
+    // TDD §3.1 module 4 / §3.4 module 23: self-service "become a X"
+    // web flows — deliberately outside seller.scope/2fa, which both
+    // require the role to already exist. Registering as a seller is the
+    // very thing that creates it.
+    Route::get('/dashboard/become-seller', [SellerOnboardingController::class, 'show'])->name('dashboard.become-seller');
+    Route::post('/dashboard/become-seller', [SellerOnboardingController::class, 'register'])->name('dashboard.become-seller.register');
+    Route::post('/dashboard/become-seller/kyc-documents', [SellerOnboardingController::class, 'submitKycDocuments'])->name('dashboard.become-seller.kyc-documents');
+    Route::post('/dashboard/become-seller/payout-details', [SellerOnboardingController::class, 'submitPayoutDetails'])->name('dashboard.become-seller.payout-details');
+    Route::post('/dashboard/become-seller/store', [SellerOnboardingController::class, 'createStore'])->name('dashboard.become-seller.store');
+    Route::post('/dashboard/become-seller/submit-for-review', [SellerOnboardingController::class, 'submitForReview'])->name('dashboard.become-seller.submit-for-review');
+
+    Route::get('/dashboard/become-shipper', [ShipperOnboardingController::class, 'show'])->name('dashboard.become-shipper');
+    Route::post('/dashboard/become-shipper', [ShipperOnboardingController::class, 'register'])->name('dashboard.become-shipper.register');
+
     // TDD §6.4 rule 4: seller.scope keeps every query here confined to
     // the acting seller's own rows, same guarantee as the API.
     Route::prefix('seller/dashboard')->name('seller.dashboard.')->middleware(['seller.scope', '2fa'])->group(function () {
         Route::get('/', [SellerController::class, 'overview'])->name('index');
         Route::get('/products', [SellerController::class, 'products'])->name('products');
+        Route::get('/products/create', [SellerController::class, 'createProduct'])->name('products.create');
+        Route::post('/products', [SellerController::class, 'storeProduct'])->name('products.store');
         Route::post('/products/{product}/submit', [SellerController::class, 'submitProductForReview'])->name('products.submit');
         Route::post('/products/{product}/archive', [SellerController::class, 'archiveProduct'])->name('products.archive');
         Route::post('/products/{product}/ai-description', [SellerController::class, 'suggestDescription'])->name('products.ai-description.suggest');

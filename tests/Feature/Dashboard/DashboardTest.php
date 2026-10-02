@@ -3,6 +3,9 @@
 namespace Tests\Feature\Dashboard;
 
 use App\Models\Address;
+use App\Models\Attribute;
+use App\Models\AttributeValue;
+use App\Models\Category;
 use App\Models\DeliveryRateCard;
 use App\Models\DeliveryZone;
 use App\Models\Order;
@@ -116,6 +119,46 @@ class DashboardTest extends TestCase
         $this->assertDatabaseHas('order_group_shipments', ['order_group_id' => $orderGroup->id]);
     }
 
+    public function test_a_seller_can_create_a_product_with_variants_and_attributes_through_the_web_form(): void
+    {
+        $seller = Seller::factory()->active()->create();
+        $this->enableTwoFactor($seller->user);
+
+        $category = Category::factory()->create();
+        $attribute = Attribute::factory()->create(['name' => 'Colour']);
+        $value = AttributeValue::factory()->for($attribute)->create(['value' => 'Black']);
+        $category->attributes()->attach($attribute->id, ['required' => false]);
+
+        $this->actingAs($seller->user)
+            ->get('/seller/dashboard/products/create')
+            ->assertOk()
+            ->assertSee('Create product')
+            ->assertSee('Colour', false);
+
+        $this->actingAs($seller->user)->post('/seller/dashboard/products', [
+            'category_id' => $category->id,
+            'title' => 'Bluetooth Speaker',
+            'description' => 'Loud and portable.',
+            'base_price' => '24.99',
+            'variants' => [
+                ['sku' => 'SKU-FORM-0001', 'stock_quantity' => 5, 'attribute_value_ids' => [$value->id]],
+            ],
+        ])->assertRedirect(route('seller.dashboard.products'));
+
+        $this->assertDatabaseHas('products', ['title' => 'Bluetooth Speaker', 'status' => 'draft']);
+        $this->assertDatabaseHas('product_variants', ['sku' => 'SKU-FORM-0001']);
+    }
+
+    public function test_a_seller_without_a_store_is_redirected_to_finish_onboarding_before_creating_a_product(): void
+    {
+        $seller = Seller::factory()->create(['status' => 'pending']);
+        $this->enableTwoFactor($seller->user);
+
+        $this->actingAs($seller->user)
+            ->get('/seller/dashboard/products/create')
+            ->assertRedirect(route('dashboard.become-seller'));
+    }
+
     public function test_a_seller_cannot_manage_another_sellers_product(): void
     {
         $seller = Seller::factory()->active()->create();
@@ -190,5 +233,34 @@ class DashboardTest extends TestCase
         $this->assertSame('published', $product->fresh()->status);
 
         $this->actingAs($admin)->get('/admin/dashboard/audit-log')->assertOk()->assertSee('seller.kyc_approved');
+    }
+
+    public function test_admin_can_filter_the_audit_log(): void
+    {
+        $admin = User::factory()->withRole('admin')->create();
+        $this->enableTwoFactor($admin);
+
+        $seller = Seller::factory()->create(['status' => 'under_review', 'kyc_status' => 'pending']);
+        $this->actingAs($admin)->post("/admin/dashboard/sellers/{$seller->id}/approve");
+
+        $activeSeller = Seller::factory()->active()->create();
+        $product = Product::factory()->for($activeSeller->store)->create(['status' => 'pending_review']);
+        $this->actingAs($admin)->post("/admin/dashboard/products/{$product->id}/approve");
+
+        $this->actingAs($admin)
+            ->get('/admin/dashboard/audit-log?action=seller.kyc_approved')
+            ->assertOk()
+            ->assertSee("Seller#{$seller->id}")
+            ->assertDontSee("Product#{$product->id}");
+
+        $this->actingAs($admin)
+            ->get('/admin/dashboard/audit-log?actor='.urlencode($admin->email))
+            ->assertOk()
+            ->assertSee("Seller#{$seller->id}");
+
+        $this->actingAs($admin)
+            ->get('/admin/dashboard/audit-log?from='.now()->addDay()->toDateString())
+            ->assertOk()
+            ->assertSee('No audit entries match these filters.');
     }
 }

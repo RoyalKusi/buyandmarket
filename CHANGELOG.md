@@ -3,6 +3,79 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Run 1.14 — Deferred-item polish: self-service web forms, audit-log filtering
+
+Scope: continuing the same deferred-item pass as Runs 1.12-1.13. Three
+gaps flagged since Run 1.7, all "fully functional via the API, web
+presentation only missing": seller self-service registration, shipper
+self-service registration, and product creation — plus audit-log
+filtering (TDD §8.9 calls for a "filterable table"; Run 1.7 shipped it
+unfiltered).
+
+### Added
+
+- **`/dashboard/become-seller`** (`App\Http\Controllers\Dashboard\
+  SellerOnboardingController`): the full TDD §3.1 module 4 stepper —
+  business info, KYC documents, payout details, store setup, first
+  product, submit for review — as one resumable page, each step's
+  status driven directly from `seller_onboarding_steps`. Every step
+  calls `App\Services\SellerOnboardingService`, the exact service the
+  API controller already used — no business logic duplicated, only
+  presentation (same discipline as Run 1.12's checkout UI).
+- **`/dashboard/become-shipper`** (`App\Http\Controllers\Dashboard\
+  ShipperOnboardingController`): single-field, immediately-active
+  registration per TDD §3.4 module 23. Extracted the API controller's
+  inline registration logic into `App\Services\ShipperOnboardingService`
+  so both surfaces share it — the API controller was refactored to call
+  it too, behavior unchanged (covered by existing API tests).
+- **Web product-creation form** (`seller/dashboard/products/create`,
+  TDD §3.2 modules 7/10 "category picker, dynamic variant rows"): leaf-
+  category picker, approved-brand dropdown, Alpine-driven dynamic
+  variant rows (add/remove) with per-category attribute checkboxes.
+  Every leaf category's attribute/value tree ships inline as JSON so
+  switching category client-side swaps the attribute checkboxes with no
+  extra request — the catalogue tree is small enough to send whole.
+  Posts through the same validation and `ProductService::create()` the
+  API uses.
+- **Sidebar**: a user without a seller/shipper row now sees "Become a
+  seller" / "Become a shipper" links instead of nothing; the existing
+  seller/shipper nav sections still appear automatically once those
+  rows exist (no change needed there — `dashboard.blade.php` already
+  checked `$user?->seller`/`$user?->shipper` directly).
+- **Audit-log filtering** (TDD §8.9): `/admin/dashboard/audit-log` now
+  takes optional `action`, `subject_type`, `actor` (name/email
+  contains), `from`, and `to` query params, all additive and all
+  optional — an admin with no filters sees exactly the previous
+  unfiltered feed. Filter dropdowns are populated from the audit log's
+  own distinct values, not a hardcoded list.
+
+### Verified against acceptance criteria
+
+- Full suite: 107 passed (385 assertions), including a new end-to-end
+  web test that drives a buyer through the entire become-a-seller
+  stepper (registration → KYC upload → payout details → store → first
+  product via the new web form → submit for review → `under_review`),
+  a shipper registration test, two product-creation-form tests
+  (happy path with attributes, and the no-store redirect), and an
+  audit-log filtering test.
+- Pint: clean. `migrate:fresh`: clean. Production build: 38.86KB
+  gzipped JS, unchanged — the new variant-row interactivity is plain
+  Alpine (already a dependency), no new JS shipped.
+
+### Deferred / flagged (still open)
+
+- **Product-image pipeline** and everything gated on it (PDP gallery,
+  categorisation/attribute-extraction AI suggestions) — flagged since
+  Runs 1.2/1.4/1.8/1.11, still genuinely out of scope here.
+- **No inline "suggest a new brand" form** on the product-creation page
+  — the brand dropdown only lists already-approved brands
+  (`POST /api/v1/seller/brands` remains API-only). A seller whose brand
+  isn't listed creates a draft product with no brand and attaches one
+  later, same limitation the API itself always had.
+- Reviews, wishlists, recommendations, sponsored placements, analytics-
+  dependent features — all unchanged from Run 1.12's list, still
+  blocked on modules this build hasn't reached.
+
 ## Run 1.13 — Deferred-item polish: MFA enforcement (TDD §8.2)
 
 Scope: continuing the same deferred-item pass as Run 1.12. Run 1.7

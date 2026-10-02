@@ -1,11 +1,10 @@
 <x-layouts.dashboard title="Products" active="seller.products">
-    {{-- A web product-creation form (category picker, dynamic variant
-         rows) is deferred — see CHANGELOG.md. Product creation is
-         fully functional via the tested API
-         (POST /api/v1/seller/products); this page manages the
-         lifecycle of products that already exist. --}}
+    <div class="mb-4">
+        <a href="{{ route('seller.dashboard.products.create') }}" class="inline-block h-10 leading-10 rounded-sm bg-blue-600 text-slate-0 px-4 text-button font-semibold hover:bg-blue-500">+ Create a product</a>
+    </div>
+
     @if ($products->isEmpty())
-        <p class="text-body-lg text-slate-500">No products yet. Create one via the seller API.</p>
+        <p class="text-body-lg text-slate-500">No products yet. Create your first one above.</p>
     @else
         <div class="space-y-4">
             @foreach ($products as $product)

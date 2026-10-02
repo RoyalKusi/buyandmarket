@@ -41,12 +41,20 @@
                         <a href="{{ route('seller.dashboard.orders') }}" class="block rounded-sm px-3 py-2 {{ $active === 'seller.orders' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Orders</a>
                         <a href="{{ route('seller.dashboard.delivery') }}" class="block rounded-sm px-3 py-2 {{ $active === 'seller.delivery' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Delivery</a>
                     </div>
+                @else
+                    <div>
+                        <a href="{{ route('dashboard.become-seller') }}" class="block rounded-sm px-3 py-2 {{ $active === 'become-seller' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Become a seller</a>
+                    </div>
                 @endif
 
                 @if ($user?->shipper)
                     <div>
                         <p class="px-3 text-caption uppercase tracking-wide text-slate-400 mb-2">Shipper</p>
                         <a href="{{ route('shipper.dashboard.index') }}" class="block rounded-sm px-3 py-2 {{ $active === 'shipper' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Deliveries</a>
+                    </div>
+                @else
+                    <div>
+                        <a href="{{ route('dashboard.become-shipper') }}" class="block rounded-sm px-3 py-2 {{ $active === 'become-shipper' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Become a shipper</a>
                     </div>
                 @endif
 

@@ -82,10 +82,40 @@ class AdminController extends Controller
         return back()->with('status', 'Product rejected.');
     }
 
-    public function auditLog(): View
+    /**
+     * TDD §8.9 "immutable, filterable table" — filtering was flagged
+     * deferred since Run 1.7. Every filter is optional and additive;
+     * an admin with no filters sees exactly the previous unfiltered feed.
+     */
+    public function auditLog(Request $request): View
     {
+        $filters = $request->validate([
+            'action' => ['nullable', 'string', 'max:100'],
+            'subject_type' => ['nullable', 'string', 'max:100'],
+            'actor' => ['nullable', 'string', 'max:100'],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date'],
+        ]);
+
+        $entries = AuditLog::query()
+            ->with('actor')
+            ->when($filters['action'] ?? null, fn ($query, $action) => $query->where('action', $action))
+            ->when($filters['subject_type'] ?? null, fn ($query, $subjectType) => $query->where('subject_type', $subjectType))
+            ->when($filters['actor'] ?? null, fn ($query, $actor) => $query->whereHas(
+                'actor',
+                fn ($userQuery) => $userQuery->where('name', 'like', "%{$actor}%")->orWhere('email', 'like', "%{$actor}%")
+            ))
+            ->when($filters['from'] ?? null, fn ($query, $from) => $query->whereDate('created_at', '>=', $from))
+            ->when($filters['to'] ?? null, fn ($query, $to) => $query->whereDate('created_at', '<=', $to))
+            ->latest('created_at')
+            ->paginate(25)
+            ->withQueryString();
+
         return view('dashboard.admin.audit-log', [
-            'entries' => AuditLog::with('actor')->latest('created_at')->paginate(25),
+            'entries' => $entries,
+            'filters' => $filters,
+            'actions' => AuditLog::query()->distinct()->orderBy('action')->pluck('action'),
+            'subjectTypes' => AuditLog::query()->distinct()->orderBy('subject_type')->pluck('subject_type'),
         ]);
     }
 

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Dashboard;
 
 use App\Http\Controllers\Controller;
+use App\Models\Brand;
+use App\Models\Category;
 use App\Models\DeliveryRateCard;
 use App\Models\DeliveryZone;
 use App\Models\OrderGroup;
@@ -66,6 +68,71 @@ class SellerController extends Controller
             ->keyBy('category_id');
 
         return view('dashboard.seller.products', ['products' => $products, 'categoryPriceStats' => $categoryPriceStats]);
+    }
+
+    /**
+     * TDD §3.2 modules 7/10 "category picker, dynamic variant rows" —
+     * deferred since Run 1.7 (product creation was API-only). Every
+     * leaf category's attributes ship inline as JSON so the variant
+     * rows can switch attribute checkboxes per category without a
+     * round trip (the catalogue's category/attribute tree is small
+     * enough to send whole).
+     */
+    public function createProduct(Request $request): View|RedirectResponse
+    {
+        $this->authorize('create', Product::class);
+
+        if ($request->user()->seller->store === null) {
+            return redirect()->route('dashboard.become-seller')
+                ->with('status', 'Finish setting up your store before creating a product.');
+        }
+
+        $leafCategories = Category::query()
+            ->whereDoesntHave('children')
+            ->with('attributes.values')
+            ->orderBy('name')
+            ->get();
+
+        return view('dashboard.seller.products-create', [
+            'categories' => $leafCategories,
+            'brands' => Brand::where('status', 'approved')->orderBy('name')->get(),
+            'categoryAttributesJson' => $leafCategories->mapWithKeys(fn (Category $category) => [
+                $category->id => $category->attributes->map(fn ($attribute) => [
+                    'id' => $attribute->id,
+                    'name' => $attribute->name,
+                    'required' => (bool) $attribute->pivot->required,
+                    'values' => $attribute->values->map(fn ($value) => ['id' => $value->id, 'value' => $value->value]),
+                ]),
+            ])->toJson(),
+        ]);
+    }
+
+    public function storeProduct(Request $request, ProductService $productService): RedirectResponse
+    {
+        $this->authorize('create', Product::class);
+
+        $data = $request->validate([
+            'category_id' => ['required', 'exists:categories,id'],
+            'brand_id' => ['nullable', 'exists:brands,id'],
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'base_price' => ['required', 'decimal:0,2', 'numeric', 'min:0'],
+            'variants' => ['required', 'array', 'min:1'],
+            'variants.*.sku' => ['required', 'string', 'max:100', 'distinct', 'unique:product_variants,sku'],
+            'variants.*.price_override' => ['nullable', 'decimal:0,2', 'numeric', 'min:0'],
+            'variants.*.stock_quantity' => ['required', 'integer', 'min:0'],
+            'variants.*.attribute_value_ids' => ['sometimes', 'array'],
+            'variants.*.attribute_value_ids.*' => ['integer', 'exists:attribute_values,id'],
+        ]);
+
+        $productService->create(
+            $request->user()->seller,
+            collect($data)->except('variants')->all(),
+            $data['variants'],
+        );
+
+        return redirect()->route('seller.dashboard.products')
+            ->with('status', 'Product created as a draft — submit it for review when ready.');
     }
 
     public function suggestDescription(Request $request, Product $product, ListingAssistant $assistant): RedirectResponse
