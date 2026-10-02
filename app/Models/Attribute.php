@@ -7,6 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property-read CategoryAttributePivot $pivot Present when loaded through Category::attributes()'s category_attributes pivot.
+ */
 class Attribute extends Model
 {
     use HasFactory;
@@ -38,6 +41,7 @@ class Attribute extends Model
     public function categories(): BelongsToMany
     {
         return $this->belongsToMany(Category::class, 'category_attributes')
+            ->using(CategoryAttributePivot::class)
             ->withPivot('required');
     }
 }

@@ -5,7 +5,16 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * $timestamps is false (no updated_at column exists) so Larastan's
+ * automatic Eloquent timestamp-column typing doesn't apply here even
+ * though created_at is still a real, manually-managed cast column.
+ *
+ * @property array<string, mixed>|null $metadata
+ * @property Carbon $created_at
+ */
 class AnalyticsEvent extends Model
 {
     public $timestamps = false;

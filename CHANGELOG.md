@@ -3,6 +3,89 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## CI: fixed a real red-test regression and cleared pre-existing Larastan debt
+
+Scope: user reported "some tests seem to be red on the PR." Two
+independent, unrelated issues on PR #2's CI run.
+
+### Fixed — Tests job (PHP 8.3 and 8.4), 32 failing tests
+
+`.github/workflows/ci.yml`'s "Tests" job never runs `npm run build` —
+that's a separate, parallel "Build front-end assets" job — so
+`public/build/manifest.json` never exists on a clean CI checkout.
+Every view rendering through `@vite` (the whole storefront/dashboard/
+auth UI) threw `ViteManifestNotFoundException` the instant a test
+touched it. This was invisible locally only because a manifest from an
+earlier manual `npm run build` happened to already be sitting on disk,
+never actually exercised against a clean checkout — exactly what CI
+always starts from. Fixed with Laravel's own documented practice:
+`tests/TestCase::setUp()` now calls `withoutVite()`. Verified by
+deleting `public/build` entirely and re-running the full suite
+(189/189 still green with zero built assets present).
+
+### Fixed — Static analysis (Larastan), 25 findings
+
+All pre-existing — confirmed none were in code touched this session,
+spanning files from every earlier build run. This sandbox normally
+can't install Larastan (GitHub dist-auth blocked, same limitation
+already noted in this file for Run 1.1), so these were never actually
+verified locally before; got it running this time by manually
+assembling `larastan/larastan`, `iamcal/sql-parser`, and the real
+`phpstan/phpstan` package from their GitHub repos (plain `git clone`
+works even though Composer's own dist-download auth doesn't) and
+patching `vendor/composer/installed.json` so Composer's autoloader
+would pick them up — a one-time local workaround, not something that
+touches anything committed. Fixes, verified against a genuine
+`vendor/bin/phpstan analyse` run (0 errors, down from 25):
+
+- Six models (`AnalyticsEvent`, `Attribute`, `CheckoutSession`,
+  `ConversationMessage`, `Embedding`, `Store`) gained `@property`
+  docblocks for cast columns (`array`, `datetime`, `decimal`) Larastan
+  wasn't inferring correctly on its own — the recurring root cause
+  behind most of the 25 findings (nullable-array offset access,
+  calling `isPast()` on what Larastan thought was a raw string, etc.).
+- New `App\Models\CategoryAttributePivot`: the `category_attributes`
+  pivot carries a real `required` column beyond the bare foreign keys,
+  which the generic `Pivot` class has no way to expose; wired via
+  `->using()` on both `Category::attributes()` and
+  `Attribute::categories()`.
+- `Cart::itemsGroupedByStore()`: `Eloquent\Collection`'s own generic
+  template requires its value type to extend `Model`, so it can never
+  accurately type "a collection of collections" — the outer level now
+  genuinely returns a plain `Support\Collection` (via `collect()`)
+  instead of just relabeling the type and hoping, with each inner
+  group staying a real `Eloquent\Collection<CartItem>`.
+- `MergeGuestCartOnLogin`: narrowed the `Login` event's generic
+  `Authenticatable` to this app's one concrete `User` model via an
+  `instanceof` guard (this app configures exactly one auth provider,
+  so never actually false) instead of asserting past the type checker.
+- `AssistantService::confirmAction()`: added an explicit null guard
+  before indexing `tool_calls[0]` — previously "safe" only by
+  unstated convention (`requires_confirmation` implies a populated
+  `tool_calls`), now actually checked.
+- `SellerOwnershipScope::apply()`: Eloquent's own `Scope` interface
+  erases the `Builder`'s model type, so static analysis has no way to
+  know the forwarded local-scope method (`scopeOwnedBySeller`) exists
+  — a narrowly-scoped `@phpstan-ignore` with a comment explaining why,
+  the one finding here that's a real tooling limitation rather than a
+  fixable type gap.
+- Four more: `AdminController` (a `Stringable` where `countBy()` wanted
+  a string — `->toString()`), `CheckoutController` (a stale `@param`
+  tag that didn't match any real parameter), `CartService` (an
+  explicit float cast matching the model's declared cast type),
+  `ProductService`/`OrderService` (two redundant `??` fallbacks on
+  values already guaranteed present by their own declared array
+  shapes) — plus removing one stale `ignoreErrors` pattern in
+  `phpstan.neon` that no longer matched anything.
+
+### Verified
+
+- Full suite: 189/189, including with `public/build` deleted to match
+  CI's actual checkout state exactly.
+- `vendor/bin/phpstan analyse --memory-limit=1G`: 0 errors (was 25).
+- Pint clean. `migrate:fresh` clean — no schema change, only a new
+  Pivot model class.
+
 ## Real brand logo wired in across the UI and emails
 
 Scope: user-supplied logo asset. Every previous "branded" surface (site

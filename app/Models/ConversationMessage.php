@@ -6,6 +6,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property array<int, array<string, mixed>>|null $tool_calls
+ * @property array<int, array<string, mixed>>|null $citations
+ */
 class ConversationMessage extends Model
 {
     use HasFactory;

@@ -6,6 +6,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property array<int, float> $vector
+ * @property array<string, mixed>|null $metadata
+ */
 class Embedding extends Model
 {
     use HasFactory;

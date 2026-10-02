@@ -137,6 +137,16 @@ class AssistantService
         }
 
         $conversation = $pending->conversation;
+
+        // requires_confirmation is only ever set true alongside a
+        // populated tool_calls (see sendMessage()'s own tool-call
+        // handling below) — this guard makes that invariant explicit
+        // rather than assumed, and gives static analysis a real type
+        // for $call instead of the nullable column type.
+        if (($pending->tool_calls[0] ?? null) === null) {
+            throw ValidationException::withMessages(['message' => 'Nothing pending confirmation on this message.']);
+        }
+
         $call = $pending->tool_calls[0];
 
         return DB::transaction(function () use ($pending, $conversation, $call) {

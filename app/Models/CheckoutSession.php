@@ -5,10 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * TDD §5.9 checkout state machine. Only App\Services\CheckoutService
  * transitions this model's status.
+ *
+ * @property array<int|string, array{fee?: string|int|float}>|null $delivery_selection
+ * @property Carbon $expires_at
  */
 class CheckoutSession extends Model
 {

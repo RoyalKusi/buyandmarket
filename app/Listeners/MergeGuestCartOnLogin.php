@@ -3,6 +3,7 @@
 namespace App\Listeners;
 
 use App\Models\Cart;
+use App\Models\User;
 use App\Services\CartService;
 use Illuminate\Auth\Events\Login;
 
@@ -30,7 +31,11 @@ class MergeGuestCartOnLogin
 
         $guestCart = Cart::where('session_id', $sessionId)->first();
 
-        if ($guestCart !== null) {
+        // The only auth provider this app configures (config/auth.php)
+        // resolves to App\Models\User, so this narrows the event's
+        // generic Authenticatable contract to the concrete model
+        // mergeIntoUserCart() needs — never actually false at runtime.
+        if ($guestCart !== null && $event->user instanceof User) {
             $this->cartService->mergeIntoUserCart($guestCart, $event->user);
         }
     }

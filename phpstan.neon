@@ -7,10 +7,5 @@ parameters:
 
     level: 5
 
-    ignoreErrors:
-        # Trait methods rely on Eloquent Model behaviour available only on
-        # the classes that `use` App\Models\Concerns\HasRoles.
-        - '#Call to an undefined method App\\Models\\Concerns\\HasRoles::#'
-
     excludePaths:
         - app/Providers/*ServiceProvider.php

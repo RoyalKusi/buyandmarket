@@ -58,6 +58,7 @@ class Category extends Model
     public function attributes(): BelongsToMany
     {
         return $this->belongsToMany(Attribute::class, 'category_attributes')
+            ->using(CategoryAttributePivot::class)
             ->withPivot('required');
     }
 

@@ -195,7 +195,7 @@ class AdminController extends Controller
         return view('dashboard.admin.ai-monitoring', [
             'conversationCount' => Conversation::count(),
             'messageCounts' => ConversationMessage::query()->selectRaw('role, count(*) as total')->groupBy('role')->pluck('total', 'role'),
-            'toolCallCounts' => $toolCalls->countBy(fn (AuditLog $log) => str($log->action)->after('ai.tool.')),
+            'toolCallCounts' => $toolCalls->countBy(fn (AuditLog $log) => str($log->action)->after('ai.tool.')->toString()),
             'pendingConfirmations' => ConversationMessage::where('requires_confirmation', true)->where('confirmed', false)->count(),
             'confirmedActions' => ConversationMessage::where('requires_confirmation', true)->where('confirmed', true)->count(),
             'suggestionsGenerated' => AuditLog::where('action', 'ai.suggestion.generated')->count(),

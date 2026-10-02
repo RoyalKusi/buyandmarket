@@ -122,7 +122,7 @@ class CheckoutController extends Controller
     }
 
     /**
-     * @param  array<string, array{rate_card_id: string}>  $selection  Validated below, keyed by store id.
+     * `selection` in the validated request data is `array<string, array{rate_card_id: string}>`, keyed by store id.
      */
     public function storeDelivery(Request $request, CheckoutSession $checkoutSession, CheckoutService $checkoutService): RedirectResponse
     {

@@ -90,7 +90,7 @@ class ProductService
                     $variant->attributeValues()->sync($variantData['attribute_value_ids']);
                 }
 
-                if (($variantData['stock_quantity'] ?? 0) > 0) {
+                if ($variantData['stock_quantity'] > 0) {
                     $this->inventoryService->adjustStock(
                         $variant,
                         $variantData['stock_quantity'],

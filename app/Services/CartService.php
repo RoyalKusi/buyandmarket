@@ -59,7 +59,7 @@ class CartService
             $item->quantity = $requestedQuantity;
             // Snapshot at add-time (TDD §3.4 module 17); re-validated
             // against the live price at checkout (CheckoutService).
-            $item->price_snapshot = $variant->price();
+            $item->price_snapshot = (float) $variant->price();
             $item->save();
 
             return $item;

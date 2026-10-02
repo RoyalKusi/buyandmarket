@@ -31,7 +31,13 @@ class SellerOwnershipScope implements Scope
     {
         // Each seller-owned model defines its own scopeOwnedBySeller()
         // local scope (App\Models\Concerns\SellerOwned); Eloquent forwards
-        // this call to it automatically.
+        // this call to it automatically. Eloquent's own Scope interface
+        // erases $builder's model type to the bare Builder, so static
+        // analysis has no way to know a local scope method exists here —
+        // this is a structural limitation of the interface Laravel
+        // itself defines, not something a type hint on this method can
+        // fix.
+        // @phpstan-ignore method.notFound
         $builder->ownedBySeller($this->seller);
     }
 }

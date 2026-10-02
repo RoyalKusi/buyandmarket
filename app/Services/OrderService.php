@@ -32,6 +32,7 @@ class OrderService
         }
 
         return DB::transaction(function () use ($session, $itemsByStore) {
+            /** @var array<int|string, array{fee?: string|int|float}> $deliverySelection */
             $deliverySelection = $session->delivery_selection ?? [];
 
             $total = 0.0;
