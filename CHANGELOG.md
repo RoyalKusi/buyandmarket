@@ -149,6 +149,13 @@ search screen, order history, or a wishlist.
 - Pint clean. `vendor/bin/phpstan analyse`: 0 errors. `migrate:fresh`
   clean (no schema change, pure application code).
 
+(Note: PR RoyalKusi/buyandmarket#4 shipped a narrower, independently
+written slice of this same Bearer-token fix and auth API — cut from an
+earlier base before this branch existed — and has since merged into
+`main`. Both changes are functionally identical on the overlapping
+files, so merging this branch is a no-op there; the entry it added for
+that work is superseded by this one and isn't repeated here.)
+
 ## CI: fixed the Tests (PHP 8.3) job — lockfile silently required PHP 8.4
 
 Scope: the previous fix round's own push turned up a third, independent
