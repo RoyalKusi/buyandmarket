@@ -16,58 +16,68 @@ class CartScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cartState = ref.watch(cartProvider);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Your cart')),
-      body: cartState.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stackTrace) => Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Could not load your cart.'),
-              const SizedBox(height: 8),
-              OutlinedButton(onPressed: () => ref.read(cartProvider.notifier).refresh(), child: const Text('Retry')),
-            ],
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text('Your cart', style: Theme.of(context).textTheme.headlineSmall),
           ),
         ),
-        data: (Cart cart) {
-          if (cart.isEmpty) {
-            return const Center(child: Text('Your cart is empty.'));
-          }
-
-          return Column(
-            children: [
-              Expanded(
-                child: ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: cart.items.length,
-                  separatorBuilder: (context, index) => const Divider(),
-                  itemBuilder: (context, index) => _CartItemTile(item: cart.items[index]),
-                ),
+        Expanded(
+          child: cartState.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (error, stackTrace) => Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Could not load your cart.'),
+                  const SizedBox(height: 8),
+                  OutlinedButton(onPressed: () => ref.read(cartProvider.notifier).refresh(), child: const Text('Retry')),
+                ],
               ),
-              SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            ),
+            data: (Cart cart) {
+              if (cart.isEmpty) {
+                return const Center(child: Text('Your cart is empty.'));
+              }
+
+              return Column(
+                children: [
+                  Expanded(
+                    child: ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: cart.items.length,
+                      separatorBuilder: (context, index) => const Divider(),
+                      itemBuilder: (context, index) => _CartItemTile(item: cart.items[index]),
+                    ),
+                  ),
+                  SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                      child: Column(
                         children: [
-                          Text('Subtotal', style: Theme.of(context).textTheme.titleMedium),
-                          Text(_currency.format(cart.subtotal), style: Theme.of(context).textTheme.titleLarge),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Subtotal', style: Theme.of(context).textTheme.titleMedium),
+                              Text(_currency.format(cart.subtotal), style: Theme.of(context).textTheme.titleLarge),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          ElevatedButton(onPressed: () => context.push('/checkout'), child: const Text('Proceed to checkout')),
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      ElevatedButton(onPressed: () => context.push('/checkout'), child: const Text('Proceed to checkout')),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
+                ],
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }

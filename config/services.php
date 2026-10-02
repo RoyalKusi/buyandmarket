@@ -62,6 +62,23 @@ return [
         'return_url' => env('PAYNOW_RETURN_URL'),
     ],
 
+    // Mobile social sign-in (App\Http\Controllers\Api\V1\SocialAuthController):
+    // the app performs native Google/Facebook sign-in on-device and sends
+    // the resulting provider access token here to verify and exchange for
+    // a Sanctum token — never a server-side redirect flow, so 'redirect'
+    // is unused but required by Socialite's config shape.
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_REDIRECT_URI', '/'),
+    ],
+
+    'facebook' => [
+        'client_id' => env('FACEBOOK_CLIENT_ID'),
+        'client_secret' => env('FACEBOOK_CLIENT_SECRET'),
+        'redirect' => env('FACEBOOK_REDIRECT_URI', '/'),
+    ],
+
     // TDD §5/§8.4: the AI platform layer's provider boundary
     // (App\Contracts\Ai\LlmProvider / EmbeddingProvider). Provider-
     // agnostic by design — swapping vendors is a config change, not a

@@ -4,8 +4,12 @@ import 'package:go_router/go_router.dart';
 
 import '../../models/cart.dart';
 import '../../providers/cart_provider.dart';
+import '../../widgets/app_top_bar.dart';
 
-/// Bottom nav shell for the five top-level buyer destinations. Cart
+/// Bottom nav shell for the five top-level buyer destinations, plus the
+/// persistent top bar (logo, search, account) shown on every tab except
+/// Search — that tab supplies its own richer app bar (a real editable
+/// field, a sort menu), so showing this one too would double up. Cart
 /// carries a live item-count badge since "what's in my cart" is the
 /// one piece of state a buyer checks constantly while browsing.
 class AppShell extends ConsumerWidget {
@@ -29,6 +33,7 @@ class AppShell extends ConsumerWidget {
     final cartCount = ref.watch(cartProvider).maybeWhen(data: (Cart cart) => cart.itemCount, orElse: () => 0);
 
     return Scaffold(
+      appBar: location.startsWith('/search') ? null : AppTopBar(showBackButton: location.startsWith('/categories/')),
       body: child,
       bottomNavigationBar: NavigationBar(
         selectedIndex: currentIndex,

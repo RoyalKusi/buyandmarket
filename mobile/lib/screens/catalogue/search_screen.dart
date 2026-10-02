@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/app_providers.dart';
+import '../../widgets/account_button.dart';
 import '../../widgets/product_grid_view.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
@@ -45,6 +46,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.sort),
+            tooltip: 'Sort',
             onSelected: (value) => setState(() => _sort = value),
             itemBuilder: (context) => const [
               PopupMenuItem(value: 'relevance', child: Text('Relevance')),
@@ -53,6 +55,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               PopupMenuItem(value: 'price_high_low', child: Text('Price: high to low')),
             ],
           ),
+          const AccountButton(),
+          const SizedBox(width: 4),
         ],
       ),
       body: _query.isEmpty

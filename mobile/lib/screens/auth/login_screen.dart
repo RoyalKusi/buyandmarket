@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/social_sign_in_buttons.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({this.redirectTo, super.key});
@@ -94,6 +95,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 TextButton(
                   onPressed: () => context.push('/register'),
                   child: const Text("Don't have an account? Create one"),
+                ),
+                const OrDivider(),
+                SocialSignInButtons(
+                  onSignedIn: () => context.go(widget.redirectTo ?? '/'),
+                  onError: (message) => setState(() => _errorMessage = message),
                 ),
               ],
             ),

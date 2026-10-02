@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api/api_exception.dart';
+import '../core/auth/social_auth_service.dart';
 import '../models/user.dart';
 import 'app_providers.dart';
 
@@ -51,6 +52,31 @@ class AuthNotifier extends StateNotifier<AuthState> {
       passwordConfirmation: passwordConfirmation,
     );
     state = AuthState(status: AuthStatus.authenticated, user: user);
+  }
+
+  /// Returns false (without throwing or changing state) when the person
+  /// cancelled the native Google sign-in sheet — a normal, silent outcome
+  /// the UI shouldn't treat as an error.
+  Future<bool> loginWithGoogle() async {
+    try {
+      final accessToken = await _ref.read(socialAuthServiceProvider).signInWithGoogle();
+      final user = await _ref.read(authRepositoryProvider).loginWithGoogle(accessToken);
+      state = AuthState(status: AuthStatus.authenticated, user: user);
+      return true;
+    } on SocialSignInCancelled {
+      return false;
+    }
+  }
+
+  Future<bool> loginWithFacebook() async {
+    try {
+      final accessToken = await _ref.read(socialAuthServiceProvider).signInWithFacebook();
+      final user = await _ref.read(authRepositoryProvider).loginWithFacebook(accessToken);
+      state = AuthState(status: AuthStatus.authenticated, user: user);
+      return true;
+    } on SocialSignInCancelled {
+      return false;
+    }
   }
 
   Future<void> logout() async {

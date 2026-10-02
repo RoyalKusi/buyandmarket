@@ -42,6 +42,18 @@ class AuthRepository {
     return AppUser.fromJson(response['data'] as Map<String, dynamic>);
   }
 
+  Future<AppUser> loginWithGoogle(String accessToken) => _loginWithProvider('google', accessToken);
+
+  Future<AppUser> loginWithFacebook(String accessToken) => _loginWithProvider('facebook', accessToken);
+
+  Future<AppUser> _loginWithProvider(String provider, String accessToken) async {
+    final response = await _apiClient.post('/auth/$provider', data: {'access_token': accessToken});
+
+    await _tokenStorage.saveToken(response['token'] as String);
+
+    return AppUser.fromJson(response['data'] as Map<String, dynamic>);
+  }
+
   Future<void> logout() async {
     try {
       await _apiClient.post('/auth/logout');
