@@ -16,6 +16,7 @@ use App\Models\Shipper;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -147,6 +148,45 @@ class DashboardTest extends TestCase
 
         $this->assertDatabaseHas('products', ['title' => 'Bluetooth Speaker', 'status' => 'draft']);
         $this->assertDatabaseHas('product_variants', ['sku' => 'SKU-FORM-0001']);
+    }
+
+    public function test_a_seller_can_get_a_text_seeded_category_and_attribute_suggestion(): void
+    {
+        $seller = Seller::factory()->active()->create();
+        $this->enableTwoFactor($seller->user);
+
+        $category = Category::factory()->create(['name' => 'Bluetooth Speakers']);
+        $colour = Attribute::factory()->create(['name' => 'Colour']);
+        $black = AttributeValue::factory()->for($colour)->create(['value' => 'Black']);
+        $category->attributes()->attach($colour->id, ['required' => false]);
+        Category::factory()->create(['name' => 'Desk Lamps']);
+
+        Http::fake([
+            'https://api.openai.com/v1/chat/completions' => Http::response([
+                'choices' => [['message' => ['role' => 'assistant', 'content' => "Category: Bluetooth Speakers\nAttributes: Colour=Black"]]],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($seller->user)->postJson('/seller/dashboard/products/suggest-categorization', [
+            'title' => 'Waterproof Speaker',
+            'bullets' => 'waterproof, black, 10h battery',
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('category.id', $category->id);
+        $response->assertJsonPath('attributes.0.value_id', $black->id);
+    }
+
+    public function test_a_seller_can_suggest_a_new_brand_from_the_product_creation_page(): void
+    {
+        $seller = Seller::factory()->active()->create();
+        $this->enableTwoFactor($seller->user);
+
+        $this->actingAs($seller->user)
+            ->post('/seller/dashboard/products/suggest-brand', ['name' => 'Acme Audio', 'slug' => 'acme-audio'])
+            ->assertRedirect(route('seller.dashboard.products.create'));
+
+        $this->assertDatabaseHas('brands', ['name' => 'Acme Audio', 'status' => 'pending', 'suggested_by_seller_id' => $seller->id]);
     }
 
     public function test_a_seller_without_a_store_is_redirected_to_finish_onboarding_before_creating_a_product(): void

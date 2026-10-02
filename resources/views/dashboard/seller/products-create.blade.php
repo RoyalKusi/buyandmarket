@@ -9,15 +9,31 @@
          swaps each variant row's attribute checkboxes with no extra
          request. --}}
     <form method="POST" action="{{ route('seller.dashboard.products.store') }}"
-        x-data="productForm({{ $categoryAttributesJson }})" class="max-w-3xl space-y-6">
+        x-data="productForm({{ $categoryAttributesJson }}, '{{ route('seller.dashboard.products.suggest-categorization') }}', '{{ csrf_token() }}')" class="max-w-3xl space-y-6">
         @csrf
+
+        {{-- TDD §5.6, scoped per docs/adr/0007: a text-seeded category/
+             attribute suggestion, matched to the real catalogue and
+             applied to the fields below — nothing here is submitted
+             directly, it only fills in the form for the seller to
+             review. --}}
+        <div class="bg-blue-50 border border-dashed border-blue-200 rounded-sm p-4">
+            <p class="text-caption uppercase tracking-wide text-blue-600 mb-2">AI: suggest a category &amp; attributes</p>
+            <textarea x-model="bullets" rows="2" placeholder="A few notes about the product, e.g. waterproof speaker, 10h battery, black"
+                class="w-full rounded-sm border border-slate-200 px-3 py-2 text-body-md mb-2"></textarea>
+            <button type="button" @click="suggestCategorization()" :disabled="suggesting" class="rounded-sm border border-blue-600 text-blue-600 px-4 h-10 text-button font-semibold hover:bg-blue-100 disabled:opacity-50">
+                <span x-text="suggesting ? 'Thinking…' : 'Suggest from my notes'"></span>
+            </button>
+            <p class="text-body-sm text-red-600 mt-2" x-show="suggestionError" x-text="suggestionError"></p>
+            <p class="text-body-sm text-slate-500 mt-2" x-show="suggestionApplied" x-cloak>Applied below — review before creating the product.</p>
+        </div>
 
         <div class="bg-slate-0 border border-slate-100 rounded-md p-6 space-y-4">
             <h2 class="text-heading-sm font-display text-slate-900">Product details</h2>
 
             <div>
                 <label for="title" class="block text-body-md text-slate-700 mb-1">Title</label>
-                <input id="title" type="text" name="title" value="{{ old('title') }}" required
+                <input id="title" type="text" name="title" x-model="title" required
                     class="w-full h-10 rounded-sm border border-slate-200 px-3 text-body-md focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600/20">
             </div>
 
@@ -48,7 +64,30 @@
                             <option value="{{ $brand->id }}" @selected(old('brand_id') == $brand->id)>{{ $brand->name }}</option>
                         @endforeach
                     </select>
+                    <button type="button" @click="showBrandForm = ! showBrandForm" class="text-body-sm text-blue-600 hover:underline mt-1">Can't find your brand? Suggest one</button>
                 </div>
+            </div>
+
+            {{-- TDD §3.2 module 11 "suggest a new brand" — deferred since
+                 Run 1.7 (fully functional via the API, web presentation
+                 only missing). A separate POST so the brand suggestion
+                 (pending admin approval, App\Services\BrandService)
+                 never gets tangled with the product form's own
+                 validation. --}}
+            <div x-show="showBrandForm" x-cloak class="border border-slate-100 rounded-sm p-4">
+                <form method="POST" action="{{ route('seller.dashboard.products.suggest-brand') }}" class="flex flex-wrap items-end gap-2">
+                    @csrf
+                    <div>
+                        <label class="block text-body-sm text-slate-700 mb-1">Brand name</label>
+                        <input type="text" name="name" required class="h-10 rounded-sm border border-slate-200 px-3 text-body-md">
+                    </div>
+                    <div>
+                        <label class="block text-body-sm text-slate-700 mb-1">Slug</label>
+                        <input type="text" name="slug" required class="h-10 rounded-sm border border-slate-200 px-3 text-body-md">
+                    </div>
+                    <button type="submit" class="h-10 rounded-sm border border-blue-600 text-blue-600 px-4 text-button font-semibold hover:bg-blue-50">Suggest brand</button>
+                </form>
+                <p class="text-body-sm text-slate-500 mt-2">An admin reviews every suggested brand before it appears in this list.</p>
             </div>
 
             <div>
@@ -100,7 +139,7 @@
                                         <div class="flex flex-wrap gap-2">
                                             <template x-for="value in attribute.values" :key="value.id">
                                                 <label class="inline-flex items-center gap-1 text-body-sm text-slate-700">
-                                                    <input type="checkbox" :name="'variants[' + index + '][attribute_value_ids][]'" :value="value.id">
+                                                    <input type="checkbox" :name="'variants[' + index + '][attribute_value_ids][]'" :value="value.id" :checked="suggestedValueIds.includes(value.id)">
                                                     <span x-text="value.value"></span>
                                                 </label>
                                             </template>
@@ -118,11 +157,18 @@
     </form>
 
     <script>
-        function productForm(categoryAttributesById) {
+        function productForm(categoryAttributesById, suggestUrl, csrfToken) {
             return {
+                title: '{{ old('title') }}',
+                bullets: '',
                 categoryId: '{{ old('category_id') }}',
                 variants: [{ key: 0, sku: '', stock_quantity: 0, price_override: '' }],
                 nextKey: 1,
+                showBrandForm: false,
+                suggesting: false,
+                suggestionError: null,
+                suggestionApplied: false,
+                suggestedValueIds: [],
                 get categoryAttributes() {
                     return categoryAttributesById[this.categoryId] ?? [];
                 },
@@ -131,6 +177,40 @@
                 },
                 removeVariant(index) {
                     this.variants.splice(index, 1);
+                },
+                async suggestCategorization() {
+                    if (! this.title || ! this.bullets) {
+                        this.suggestionError = 'Fill in the title and notes above first.';
+                        return;
+                    }
+
+                    this.suggesting = true;
+                    this.suggestionError = null;
+                    this.suggestionApplied = false;
+
+                    try {
+                        const response = await fetch(suggestUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, Accept: 'application/json' },
+                            body: JSON.stringify({ title: this.title, bullets: this.bullets }),
+                        });
+
+                        if (! response.ok) {
+                            throw new Error('The suggestion request failed.');
+                        }
+
+                        const data = await response.json();
+
+                        if (data.category) {
+                            this.categoryId = String(data.category.id);
+                        }
+                        this.suggestedValueIds = data.attributes.map((a) => a.value_id);
+                        this.suggestionApplied = true;
+                    } catch (e) {
+                        this.suggestionError = 'Could not get a suggestion — fill in the fields manually.';
+                    } finally {
+                        this.suggesting = false;
+                    }
                 },
             };
         }

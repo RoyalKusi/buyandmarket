@@ -3,9 +3,12 @@
 namespace App\Services\Ai;
 
 use App\Contracts\Ai\LlmProvider;
+use App\Models\Category;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\AuditLogger;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 /**
  * TDD §5.6/§4.2 seller journey: "LLM prompted with seller-supplied photos
@@ -113,5 +116,84 @@ class ListingAssistant
         ]);
 
         return trim((string) $completion->content, " \t\n\r\0\x0B\"");
+    }
+
+    /**
+     * TDD §5.6 "suggest a category from a photo, extract colour/material"
+     * — scoped per docs/adr/0007 to a text-seeded version: the title and
+     * the seller's own bullet notes, matched against the real leaf-
+     * category/attribute catalogue (never an invented one). The LLM is
+     * asked to answer in a fixed two-line format so the result can be
+     * parsed deterministically and matched to real IDs — nothing here
+     * trusts free-text well enough to invent a category or attribute
+     * value that doesn't already exist in the catalogue.
+     *
+     * Not audited (unlike suggestDescription()): nothing is written yet
+     * — this only returns a preview for the seller to apply themselves
+     * on the still-unsaved product-creation form, so TDD §8.9's "every
+     * privileged mutation" scope doesn't apply until the form is
+     * actually submitted.
+     *
+     * @param  Collection<int, Category>  $leafCategories
+     * @return array{category: ?Category, attributes: array<int, array{attribute_id: int, attribute_name: string, value_id: int, value: string}>}
+     */
+    public function suggestCategorization(string $title, string $bullets, Collection $leafCategories): array
+    {
+        $catalogue = $leafCategories->map(function (Category $category) {
+            $attributeNames = $category->attributes->pluck('name')->implode(', ');
+
+            return "- {$category->name}".($attributeNames ? " (attributes: {$attributeNames})" : '');
+        })->implode("\n");
+
+        $completion = $this->llm->complete([
+            [
+                'role' => 'system',
+                'content' => "You match a product to exactly one category from a fixed list, and suggest values for that category's listed attributes. Respond in exactly this format, nothing else:\nCategory: <exact name from the list>\nAttributes: <attribute>=<value>; <attribute>=<value>\nOnly use attributes/values that plausibly apply; if none apply, write \"Attributes: none\".",
+            ],
+            [
+                'role' => 'user',
+                'content' => "Categories:\n{$catalogue}\n\nProduct title: {$title}\nSeller's notes:\n{$bullets}",
+            ],
+        ]);
+
+        return $this->parseCategorization((string) $completion->content, $leafCategories);
+    }
+
+    /**
+     * @param  Collection<int, Category>  $leafCategories
+     * @return array{category: ?Category, attributes: array<int, array{attribute_id: int, attribute_name: string, value_id: int, value: string}>}
+     */
+    private function parseCategorization(string $raw, Collection $leafCategories): array
+    {
+        $categoryLine = Str::of($raw)->after('Category:')->before("\n")->trim();
+        $category = $leafCategories->first(fn (Category $c) => Str::lower($c->name) === Str::lower($categoryLine));
+
+        $suggestedAttributes = [];
+
+        if ($category !== null) {
+            $attributesLine = Str::of($raw)->after('Attributes:')->trim();
+
+            foreach (explode(';', (string) $attributesLine) as $pair) {
+                if (! str_contains($pair, '=')) {
+                    continue;
+                }
+
+                [$attributeName, $valueName] = array_map('trim', explode('=', $pair, 2));
+
+                $attribute = $category->attributes->first(fn ($a) => Str::lower($a->name) === Str::lower($attributeName));
+                $value = $attribute?->values->first(fn ($v) => Str::lower($v->value) === Str::lower($valueName));
+
+                if ($attribute !== null && $value !== null) {
+                    $suggestedAttributes[] = [
+                        'attribute_id' => $attribute->id,
+                        'attribute_name' => $attribute->name,
+                        'value_id' => $value->id,
+                        'value' => $value->value,
+                    ];
+                }
+            }
+        }
+
+        return ['category' => $category, 'attributes' => $suggestedAttributes];
     }
 }

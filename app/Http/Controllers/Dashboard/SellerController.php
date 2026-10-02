@@ -12,9 +12,11 @@ use App\Models\Product;
 use App\Models\ProductImage;
 use App\Models\ProductVariant;
 use App\Services\Ai\ListingAssistant;
+use App\Services\BrandService;
 use App\Services\ProductImageService;
 use App\Services\ProductService;
 use App\Services\ShippingService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -107,6 +109,53 @@ class SellerController extends Controller
                 ]),
             ])->toJson(),
         ]);
+    }
+
+    /**
+     * TDD §5.6 text-seeded category/attribute suggestion (docs/adr/0007)
+     * — a preview only, returned as JSON for the create-product page's
+     * Alpine component to apply to the still-unsaved form, never
+     * persisted or audited here (see ListingAssistant::
+     * suggestCategorization()'s own docblock for why).
+     */
+    public function suggestCategorization(Request $request, ListingAssistant $assistant): JsonResponse
+    {
+        $this->authorize('create', Product::class);
+
+        $data = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'bullets' => ['required', 'string', 'max:1000'],
+        ]);
+
+        $leafCategories = Category::query()->whereDoesntHave('children')->with('attributes.values')->get();
+        $suggestion = $assistant->suggestCategorization($data['title'], $data['bullets'], $leafCategories);
+
+        return response()->json([
+            'category' => $suggestion['category'] ? ['id' => $suggestion['category']->id, 'name' => $suggestion['category']->name] : null,
+            'attributes' => $suggestion['attributes'],
+        ]);
+    }
+
+    /**
+     * TDD §3.2 module 11 "suggest a new brand" — deferred since Run 1.7
+     * (fully functional via the API, `POST /api/v1/seller/brands`; web
+     * presentation only missing). Submitted inline from the product-
+     * creation page rather than a separate screen, since that's the one
+     * moment a seller actually discovers their brand isn't listed.
+     */
+    public function suggestBrand(Request $request, BrandService $brandService): RedirectResponse
+    {
+        $this->authorize('create', Brand::class);
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'slug' => ['required', 'string', 'max:255', 'unique:brands,slug'],
+        ]);
+
+        $brandService->suggest($request->user()->seller, $data['name'], $data['slug']);
+
+        return redirect()->route('seller.dashboard.products.create')
+            ->with('status', 'Brand suggested — it will appear in the dropdown once an admin approves it.');
     }
 
     public function storeProduct(Request $request, ProductService $productService): RedirectResponse

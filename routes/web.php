@@ -84,6 +84,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [SellerController::class, 'overview'])->name('index');
         Route::get('/products', [SellerController::class, 'products'])->name('products');
         Route::get('/products/create', [SellerController::class, 'createProduct'])->name('products.create');
+        Route::post('/products/suggest-categorization', [SellerController::class, 'suggestCategorization'])->name('products.suggest-categorization');
+        Route::post('/products/suggest-brand', [SellerController::class, 'suggestBrand'])->name('products.suggest-brand');
         Route::post('/products', [SellerController::class, 'storeProduct'])->name('products.store');
         Route::post('/products/{product}/submit', [SellerController::class, 'submitProductForReview'])->name('products.submit');
         Route::post('/products/{product}/archive', [SellerController::class, 'archiveProduct'])->name('products.archive');

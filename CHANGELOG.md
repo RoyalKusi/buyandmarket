@@ -3,6 +3,52 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Run 1.16 — Text-seeded categorization suggestions + brand-suggest web form
+
+Scope: continuing the deferred-item pass. Two small gaps, both on the
+product-creation page: TDD §5.6's category/attribute suggestions
+(scoped per docs/adr/0007 — text-seeded from the title/notes, matched
+to the real catalogue, never invented), and the inline "suggest a new
+brand" flow (flagged since Run 1.7, API-only).
+
+### Added
+
+- **`ListingAssistant::suggestCategorization()`**: given a title and a
+  few bullet notes, asks the LLM to pick one category from the real
+  leaf-category list and suggest values for that category's own
+  attributes, in a fixed two-line format parsed deterministically
+  (`App\Services\Ai\ListingAssistant::parseCategorization()`) — a
+  suggestion only resolves to a real `Category`/`AttributeValue` row;
+  anything that doesn't match the actual catalogue is silently dropped,
+  never invented. Not audit-logged: nothing is written until the seller
+  submits the product form, so TDD §8.9's "every privileged mutation"
+  scope doesn't apply yet.
+- **Wired into `seller/dashboard/products/create`**: a notes box and
+  "Suggest from my notes" button (Alpine, `fetch()` to a new JSON
+  endpoint) fills in the category dropdown and pre-ticks the suggested
+  attribute checkboxes — the seller still reviews and submits manually.
+- **Inline brand suggestion**: "Can't find your brand? Suggest one"
+  reveals a small form on the same page, posting to
+  `App\Services\BrandService::suggest()` (the exact service the API's
+  `POST /api/v1/seller/brands` already used) — pending admin approval,
+  same as the API path always was.
+
+### Verified against acceptance criteria
+
+- Full suite: 115 passed (411 assertions) — new coverage: a text-seeded
+  suggestion correctly matches a real category/attribute-value pair
+  (via `Http::fake`) and a brand suggestion creates a `pending` row
+  owned by the acting seller.
+- Pint: clean. `migrate:fresh`: clean (no new migration this run).
+  Production build: 38.86KB gzipped JS, unchanged.
+
+### Deferred / flagged (still open)
+
+- Still no photo-driven category/attribute extraction — see
+  docs/adr/0007; this run's suggestions are text-seeded only.
+- Reviews, wishlists, recommendations, sponsored placements, analytics-
+  dependent seller insights — unchanged from Run 1.14's list.
+
 ## Run 1.15 — Product image pipeline + PDP gallery
 
 Scope: continuing the deferred-item pass (Runs 1.12-1.14). The largest
