@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AddressController;
 use App\Http\Controllers\Api\V1\Admin\BrandModerationController;
 use App\Http\Controllers\Api\V1\Admin\KycReviewController;
 use App\Http\Controllers\Api\V1\Admin\ProductModerationController;
@@ -125,6 +126,12 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::prefix('wishlist')->name('wishlist.')->group(function () {
             Route::get('/', [WishlistController::class, 'index'])->name('index');
             Route::post('/{product}', [WishlistController::class, 'toggle'])->name('toggle');
+        });
+
+        Route::prefix('addresses')->name('addresses.')->group(function () {
+            Route::get('/', [AddressController::class, 'index'])->name('index');
+            Route::post('/', [AddressController::class, 'store'])->name('store');
+            Route::delete('/{address}', [AddressController::class, 'destroy'])->name('destroy');
         });
 
         Route::post('/admin/users/{user}/roles', [RoleAssignmentController::class, 'store'])
