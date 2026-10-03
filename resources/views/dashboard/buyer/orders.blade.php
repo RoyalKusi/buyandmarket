@@ -1,6 +1,9 @@
 <x-layouts.dashboard title="My orders" active="buyer">
     @if ($orders->isEmpty())
-        <p class="text-body-lg text-slate-500">You haven't placed any orders yet.</p>
+        <div class="text-center py-16">
+            <x-icon name="orders" class="w-12 h-12 mx-auto text-slate-300" />
+            <p class="mt-3 text-body-lg text-slate-500">You haven't placed any orders yet.</p>
+        </div>
     @else
         <div class="bg-slate-0 border border-slate-100 rounded-md overflow-hidden">
             <table class="w-full text-body-md">
@@ -23,7 +26,7 @@
                             </td>
                             <td class="px-4 py-3 text-right tabular-nums">${{ number_format((float) $order->total, 2) }}</td>
                             <td class="px-4 py-3 text-right">
-                                <a href="{{ route('dashboard.orders.show', $order) }}" class="text-blue-600 hover:underline">View</a>
+                                <a href="{{ route('dashboard.orders.show', $order) }}" class="inline-flex items-center gap-1 text-blue-600 hover:underline">View<x-icon name="chevron-right" class="w-4 h-4" /></a>
                             </td>
                         </tr>
                     @endforeach

@@ -52,4 +52,6 @@
         Already have an account?
         <a href="{{ route('login') }}" class="text-blue-600 hover:underline">Sign in</a>
     </p>
+
+    <x-social-login-buttons />
 </x-layouts.guest>

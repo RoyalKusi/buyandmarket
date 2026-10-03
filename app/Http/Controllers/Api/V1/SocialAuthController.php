@@ -4,11 +4,9 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use Illuminate\Auth\Events\Registered;
+use App\Services\SocialAccountResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Socialite\Contracts\User as SocialiteUser;
 use Laravel\Socialite\Facades\Socialite;
@@ -22,7 +20,10 @@ use Throwable;
  * server-initiated redirect flow Socialite is usually used for; it
  * only uses Socialite's stateless `userFromToken()` to verify a token
  * the app already has and fetch the provider's profile for it, via
- * each provider's own userinfo/Graph API endpoint.
+ * each provider's own userinfo/Graph API endpoint. The web's own
+ * sign-in (App\Http\Controllers\Auth\SocialLoginController) uses the
+ * redirect flow instead, sharing App\Services\SocialAccountResolver's
+ * find-or-create logic with this controller.
  *
  * Shares `AuthController::issueToken()`'s exact response shape
  * (`{data, token}`) so the mobile client's existing
@@ -31,13 +32,15 @@ use Throwable;
  */
 class SocialAuthController extends Controller
 {
+    public function __construct(private readonly SocialAccountResolver $resolver) {}
+
     public function google(Request $request): JsonResponse
     {
         $data = $request->validate(['access_token' => ['required', 'string']]);
 
         $socialUser = $this->resolveSocialUser('google', $data['access_token']);
 
-        $user = $this->findOrCreateUser($socialUser, 'google_id');
+        $user = $this->resolver->resolve($socialUser, 'google_id');
 
         return response()->json([
             'data' => $user,
@@ -60,7 +63,7 @@ class SocialAuthController extends Controller
             ]);
         }
 
-        $user = $this->findOrCreateUser($socialUser, 'facebook_id');
+        $user = $this->resolver->resolve($socialUser, 'facebook_id');
 
         return response()->json([
             'data' => $user,
@@ -84,58 +87,6 @@ class SocialAuthController extends Controller
                 'access_token' => "Could not verify this {$provider} account.",
             ]);
         }
-    }
-
-    /**
-     * Matched first by the provider's own ID (a returning social-login
-     * user); falling back to linking an existing email/password account
-     * by email (the same person signing in a different way); otherwise a
-     * brand-new buyer account. Either provider having already
-     * authenticated the person is treated as email ownership proof, same
-     * trust level as clicking a verification link.
-     */
-    private function findOrCreateUser(SocialiteUser $socialUser, string $idColumn): User
-    {
-        $user = User::where($idColumn, $socialUser->getId())->first();
-
-        if ($user !== null) {
-            return $user;
-        }
-
-        $user = User::where('email', $socialUser->getEmail())->first();
-
-        if ($user !== null) {
-            $user->forceFill([
-                $idColumn => $socialUser->getId(),
-                'avatar_url' => $user->avatar_url ?? $socialUser->getAvatar(),
-            ])->save();
-
-            return $user;
-        }
-
-        $user = User::create([
-            'name' => $socialUser->getName() ?? $socialUser->getNickname() ?? 'BuyAndMarket buyer',
-            'email' => $socialUser->getEmail(),
-            $idColumn => $socialUser->getId(),
-            'avatar_url' => $socialUser->getAvatar(),
-            // Unusable for password login (never returned to the client,
-            // never matched by Hash::check against anything a person
-            // could type) — this account only ever signs in through this
-            // same provider, exactly like AuthController-issued accounts
-            // always have a real password.
-            'password' => Hash::make(Str::random(40)),
-        ]);
-
-        // email_verified_at isn't mass-assignable (by design — it's never
-        // meant to be settable from ordinary request input), so it's set
-        // separately here rather than silently dropped by $fillable.
-        $user->forceFill(['email_verified_at' => now()])->save();
-
-        $user->assignRole('buyer');
-
-        event(new Registered($user));
-
-        return $user;
     }
 
     private function issueToken(Request $request, User $user): string

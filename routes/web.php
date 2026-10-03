@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Auth\SocialLoginController;
 use App\Http\Controllers\Dashboard\AdminController;
 use App\Http\Controllers\Dashboard\BuyerController;
 use App\Http\Controllers\Dashboard\SellerController;
@@ -14,6 +15,21 @@ use App\Http\Controllers\Storefront\ReviewController;
 use App\Http\Controllers\Storefront\SearchController;
 use App\Http\Controllers\Storefront\StoreController;
 use Illuminate\Support\Facades\Route;
+
+// "Continue with Google/Facebook" on the login/register views
+// (Fortify::loginView/registerView, FortifyServiceProvider) — the
+// server-redirect OAuth flow, sharing App\Services\
+// SocialAccountResolver's find-or-create logic with the mobile API's
+// token-based equivalent (Api\V1\SocialAuthController). Guest-only,
+// like Fortify's own login/register routes.
+Route::middleware('guest')->group(function () {
+    Route::get('/auth/{provider}/redirect', [SocialLoginController::class, 'redirect'])
+        ->whereIn('provider', ['google', 'facebook'])
+        ->name('social.redirect');
+    Route::get('/auth/{provider}/callback', [SocialLoginController::class, 'callback'])
+        ->whereIn('provider', ['google', 'facebook'])
+        ->name('social.callback');
+});
 
 // Design System §6.1-6.5: the buyer-facing storefront. Named
 // storefront.* throughout so a future dashboard/admin web surface never

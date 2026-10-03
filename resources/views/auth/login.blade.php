@@ -40,4 +40,6 @@
         New to BuyAndMarket?
         <a href="{{ route('register') }}" class="text-blue-600 hover:underline">Create an account</a>
     </p>
+
+    <x-social-login-buttons />
 </x-layouts.guest>

@@ -6,18 +6,21 @@ import '../../models/cart.dart';
 import '../../providers/cart_provider.dart';
 import '../../widgets/app_top_bar.dart';
 
-/// Bottom nav shell for the five top-level buyer destinations, plus the
+/// Bottom nav shell for the four top-level buyer destinations, plus the
 /// persistent top bar (logo, search, account) shown on every tab except
 /// Search — that tab supplies its own richer app bar (a real editable
-/// field, a sort menu), so showing this one too would double up. Cart
-/// carries a live item-count badge since "what's in my cart" is the
-/// one piece of state a buyer checks constantly while browsing.
+/// field, a sort menu), so showing this one too would double up. Search
+/// has no bottom-nav tab of its own: the top bar's search pill (on
+/// every other tab) is its one entry point, so there's no second way to
+/// reach it duplicating that affordance. Cart carries a live item-count
+/// badge since "what's in my cart" is the one piece of state a buyer
+/// checks constantly while browsing.
 class AppShell extends ConsumerWidget {
   const AppShell({required this.child, super.key});
 
   final Widget child;
 
-  static const _tabs = ['/', '/search', '/cart', '/orders', '/wishlist'];
+  static const _tabs = ['/', '/cart', '/orders', '/wishlist'];
 
   int _indexFor(String location) {
     for (var i = _tabs.length - 1; i >= 0; i--) {
@@ -40,7 +43,6 @@ class AppShell extends ConsumerWidget {
         onDestinationSelected: (index) => context.go(_tabs[index]),
         destinations: [
           const NavigationDestination(icon: Icon(Icons.storefront_outlined), selectedIcon: Icon(Icons.storefront), label: 'Home'),
-          const NavigationDestination(icon: Icon(Icons.search_outlined), selectedIcon: Icon(Icons.search), label: 'Search'),
           NavigationDestination(
             icon: Badge(
               label: Text('$cartCount'),
