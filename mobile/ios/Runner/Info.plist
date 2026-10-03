@@ -45,5 +45,51 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+
+	<!-- Facebook Login (flutter_facebook_auth). Real values come from the
+	     app's dashboard at developers.facebook.com — Settings > Basic. -->
+	<key>FacebookAppID</key>
+	<string>YOUR_FACEBOOK_APP_ID</string>
+	<key>FacebookClientToken</key>
+	<string>YOUR_FACEBOOK_CLIENT_TOKEN</string>
+	<key>FacebookDisplayName</key>
+	<string>BuyAndMarket</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>fbapi</string>
+		<string>fb-messenger-share-api</string>
+		<string>fbauth2</string>
+		<string>fbshareextension</string>
+	</array>
+
+	<!-- Google Sign-In (google_sign_in) on iOS needs its own OAuth client
+	     ID here (not the Web one GOOGLE_CLIENT_ID in the backend's .env
+	     refers to) — from Google Cloud Console > Credentials > the iOS
+	     client created for this app's bundle ID. -->
+	<key>GIDClientID</key>
+	<string>YOUR_IOS_CLIENT_ID.apps.googleusercontent.com</string>
+
+	<!-- Google Sign-In (google_sign_in) and Facebook Login both return to
+	     the app via a custom URL scheme. REVERSED_CLIENT_ID comes from
+	     the GoogleService-Info.plist Google Cloud Console generates for
+	     this app's iOS OAuth client (Credentials > iOS client) — it is
+	     NOT the same as GOOGLE_CLIENT_ID in the backend's .env, which is
+	     the Web client. fbYOUR_FACEBOOK_APP_ID must match
+	     FacebookAppID above with "fb" prefixed. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.YOUR_IOS_REVERSED_CLIENT_ID</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>fbYOUR_FACEBOOK_APP_ID</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

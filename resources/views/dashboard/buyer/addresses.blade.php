@@ -2,25 +2,31 @@
     <div class="grid gap-6 lg:grid-cols-[1fr_360px]">
         <div class="space-y-4">
             @forelse ($addresses as $address)
-                <div class="bg-slate-0 border border-slate-100 rounded-md p-4 flex items-start justify-between">
-                    <div>
-                        <p class="text-body-md font-medium text-slate-900">
-                            {{ $address->label }}
-                            @if ($address->is_default)
-                                <span class="ml-2 inline-flex items-center rounded-xs px-2 py-0.5 text-caption bg-blue-50 text-blue-600">Default</span>
-                            @endif
-                        </p>
-                        <p class="text-body-sm text-slate-600">{{ $address->recipient_name }} &middot; {{ $address->phone }}</p>
-                        <p class="text-body-sm text-slate-600">{{ $address->street_address }}, {{ $address->area }}, {{ $address->city }}, {{ $address->province }}</p>
+                <div class="bg-slate-0 border border-slate-100 rounded-md p-4 flex items-start justify-between gap-4">
+                    <div class="flex gap-3">
+                        <x-icon name="map-pin" class="w-5 h-5 shrink-0 text-slate-400 mt-0.5" />
+                        <div>
+                            <p class="text-body-md font-medium text-slate-900">
+                                {{ $address->label }}
+                                @if ($address->is_default)
+                                    <span class="ml-2 inline-flex items-center rounded-xs px-2 py-0.5 text-caption bg-blue-50 text-blue-600">Default</span>
+                                @endif
+                            </p>
+                            <p class="text-body-sm text-slate-600">{{ $address->recipient_name }} &middot; {{ $address->phone }}</p>
+                            <p class="text-body-sm text-slate-600">{{ $address->street_address }}, {{ $address->area }}, {{ $address->city }}, {{ $address->province }}</p>
+                        </div>
                     </div>
                     <form method="POST" action="{{ route('dashboard.addresses.destroy', $address) }}" onsubmit="return confirm('Remove this address?')">
                         @csrf
                         @method('DELETE')
-                        <button type="submit" class="text-body-sm text-red-600 hover:underline">Remove</button>
+                        <button type="submit" class="inline-flex items-center gap-1 text-body-sm text-red-600 hover:underline"><x-icon name="trash" class="w-4 h-4" />Remove</button>
                     </form>
                 </div>
             @empty
-                <p class="text-body-lg text-slate-500">No saved addresses yet.</p>
+                <div class="text-center py-16">
+                    <x-icon name="map-pin" class="w-12 h-12 mx-auto text-slate-300" />
+                    <p class="mt-3 text-body-lg text-slate-500">No saved addresses yet.</p>
+                </div>
             @endforelse
         </div>
 

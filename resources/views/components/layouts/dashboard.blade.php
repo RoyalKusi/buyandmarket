@@ -27,62 +27,67 @@
             <nav class="flex-1 px-3 py-4 space-y-6 text-body-md">
                 <div>
                     <p class="px-3 text-caption uppercase tracking-wide text-slate-400 mb-2">My account</p>
-                    <a href="{{ route('dashboard') }}" class="block rounded-sm px-3 py-2 {{ $active === 'buyer' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Orders</a>
-                    <a href="{{ route('dashboard.addresses') }}" class="block rounded-sm px-3 py-2 {{ $active === 'addresses' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Addresses</a>
-                    <a href="{{ route('dashboard.wishlist') }}" class="block rounded-sm px-3 py-2 {{ $active === 'wishlist' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Wishlist</a>
-                    <a href="{{ route('dashboard.assistant') }}" class="block rounded-sm px-3 py-2 {{ $active === 'assistant' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Ask BM Assistant</a>
-                    <a href="{{ route('dashboard.security') }}" class="block rounded-sm px-3 py-2 {{ $active === 'security' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Security</a>
+                    <a href="{{ route('dashboard') }}" class="flex items-center gap-2.5 rounded-sm px-3 py-2 {{ $active === 'buyer' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}"><x-icon name="orders" class="w-5 h-5 shrink-0" />Orders</a>
+                    <a href="{{ route('dashboard.addresses') }}" class="flex items-center gap-2.5 rounded-sm px-3 py-2 {{ $active === 'addresses' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}"><x-icon name="map-pin" class="w-5 h-5 shrink-0" />Addresses</a>
+                    <a href="{{ route('dashboard.wishlist') }}" class="flex items-center gap-2.5 rounded-sm px-3 py-2 {{ $active === 'wishlist' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}"><x-icon name="heart" class="w-5 h-5 shrink-0" />Wishlist</a>
+                    <a href="{{ route('dashboard.assistant') }}" class="flex items-center gap-2.5 rounded-sm px-3 py-2 {{ $active === 'assistant' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}"><x-icon name="chat" class="w-5 h-5 shrink-0" />Ask BM Assistant</a>
+                    <a href="{{ route('dashboard.security') }}" class="flex items-center gap-2.5 rounded-sm px-3 py-2 {{ $active === 'security' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}"><x-icon name="shield-check" class="w-5 h-5 shrink-0" />Security</a>
                 </div>
 
                 @if ($user?->seller)
                     <div>
                         <p class="px-3 text-caption uppercase tracking-wide text-slate-400 mb-2">Seller</p>
-                        <a href="{{ route('seller.dashboard.index') }}" class="block rounded-sm px-3 py-2 {{ $active === 'seller.overview' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Overview</a>
-                        <a href="{{ route('seller.dashboard.products') }}" class="block rounded-sm px-3 py-2 {{ $active === 'seller.products' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Products</a>
-                        <a href="{{ route('seller.dashboard.orders') }}" class="block rounded-sm px-3 py-2 {{ $active === 'seller.orders' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Orders</a>
-                        <a href="{{ route('seller.dashboard.delivery') }}" class="block rounded-sm px-3 py-2 {{ $active === 'seller.delivery' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Delivery</a>
-                        <a href="{{ route('seller.dashboard.sponsored-campaigns') }}" class="block rounded-sm px-3 py-2 {{ $active === 'seller.sponsored' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Sponsored campaigns</a>
+                        <a href="{{ route('seller.dashboard.index') }}" class="flex items-center gap-2.5 rounded-sm px-3 py-2 {{ $active === 'seller.overview' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}"><x-icon name="storefront" class="w-5 h-5 shrink-0" />Overview</a>
+                        <a href="{{ route('seller.dashboard.products') }}" class="flex items-center gap-2.5 rounded-sm px-3 py-2 {{ $active === 'seller.products' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}"><x-icon name="archive-box" class="w-5 h-5 shrink-0" />Products</a>
+                        <a href="{{ route('seller.dashboard.orders') }}" class="flex items-center gap-2.5 rounded-sm px-3 py-2 {{ $active === 'seller.orders' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}"><x-icon name="shopping-bag" class="w-5 h-5 shrink-0" />Orders</a>
+                        <a href="{{ route('seller.dashboard.delivery') }}" class="flex items-center gap-2.5 rounded-sm px-3 py-2 {{ $active === 'seller.delivery' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}"><x-icon name="truck" class="w-5 h-5 shrink-0" />Delivery</a>
+                        <a href="{{ route('seller.dashboard.sponsored-campaigns') }}" class="flex items-center gap-2.5 rounded-sm px-3 py-2 {{ $active === 'seller.sponsored' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}"><x-icon name="megaphone" class="w-5 h-5 shrink-0" />Sponsored campaigns</a>
                     </div>
                 @else
                     <div>
-                        <a href="{{ route('dashboard.become-seller') }}" class="block rounded-sm px-3 py-2 {{ $active === 'become-seller' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Become a seller</a>
+                        <a href="{{ route('dashboard.become-seller') }}" class="flex items-center gap-2.5 rounded-sm px-3 py-2 {{ $active === 'become-seller' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}"><x-icon name="plus-circle" class="w-5 h-5 shrink-0" />Become a seller</a>
                     </div>
                 @endif
 
                 @if ($user?->shipper)
                     <div>
                         <p class="px-3 text-caption uppercase tracking-wide text-slate-400 mb-2">Shipper</p>
-                        <a href="{{ route('shipper.dashboard.index') }}" class="block rounded-sm px-3 py-2 {{ $active === 'shipper' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Deliveries</a>
+                        <a href="{{ route('shipper.dashboard.index') }}" class="flex items-center gap-2.5 rounded-sm px-3 py-2 {{ $active === 'shipper' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}"><x-icon name="truck" class="w-5 h-5 shrink-0" />Deliveries</a>
                     </div>
                 @else
                     <div>
-                        <a href="{{ route('dashboard.become-shipper') }}" class="block rounded-sm px-3 py-2 {{ $active === 'become-shipper' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Become a shipper</a>
+                        <a href="{{ route('dashboard.become-shipper') }}" class="flex items-center gap-2.5 rounded-sm px-3 py-2 {{ $active === 'become-shipper' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}"><x-icon name="plus-circle" class="w-5 h-5 shrink-0" />Become a shipper</a>
                     </div>
                 @endif
 
                 @if ($user?->hasRole('admin'))
                     <div>
                         <p class="px-3 text-caption uppercase tracking-wide text-slate-400 mb-2">Admin</p>
-                        <a href="{{ route('admin.dashboard.sellers') }}" class="block rounded-sm px-3 py-2 {{ $active === 'admin.sellers' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Seller approvals</a>
-                        <a href="{{ route('admin.dashboard.products') }}" class="block rounded-sm px-3 py-2 {{ $active === 'admin.products' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Product moderation</a>
-                        <a href="{{ route('admin.dashboard.reviews') }}" class="block rounded-sm px-3 py-2 {{ $active === 'admin.reviews' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Reviews</a>
-                        <a href="{{ route('admin.dashboard.sponsored-campaigns') }}" class="block rounded-sm px-3 py-2 {{ $active === 'admin.sponsored' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Sponsored campaigns</a>
-                        <a href="{{ route('admin.dashboard.audit-log') }}" class="block rounded-sm px-3 py-2 {{ $active === 'admin.audit' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">Audit log</a>
-                        <a href="{{ route('admin.dashboard.ai-monitoring') }}" class="block rounded-sm px-3 py-2 {{ $active === 'admin.ai' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}">AI monitoring</a>
+                        <a href="{{ route('admin.dashboard.sellers') }}" class="flex items-center gap-2.5 rounded-sm px-3 py-2 {{ $active === 'admin.sellers' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}"><x-icon name="check-badge" class="w-5 h-5 shrink-0" />Seller approvals</a>
+                        <a href="{{ route('admin.dashboard.products') }}" class="flex items-center gap-2.5 rounded-sm px-3 py-2 {{ $active === 'admin.products' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}"><x-icon name="flag" class="w-5 h-5 shrink-0" />Product moderation</a>
+                        <a href="{{ route('admin.dashboard.reviews') }}" class="flex items-center gap-2.5 rounded-sm px-3 py-2 {{ $active === 'admin.reviews' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}"><x-icon name="star" class="w-5 h-5 shrink-0" />Reviews</a>
+                        <a href="{{ route('admin.dashboard.sponsored-campaigns') }}" class="flex items-center gap-2.5 rounded-sm px-3 py-2 {{ $active === 'admin.sponsored' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}"><x-icon name="megaphone" class="w-5 h-5 shrink-0" />Sponsored campaigns</a>
+                        <a href="{{ route('admin.dashboard.audit-log') }}" class="flex items-center gap-2.5 rounded-sm px-3 py-2 {{ $active === 'admin.audit' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}"><x-icon name="clipboard" class="w-5 h-5 shrink-0" />Audit log</a>
+                        <a href="{{ route('admin.dashboard.ai-monitoring') }}" class="flex items-center gap-2.5 rounded-sm px-3 py-2 {{ $active === 'admin.ai' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50' }}"><x-icon name="sparkles" class="w-5 h-5 shrink-0" />AI monitoring</a>
                     </div>
                 @endif
             </nav>
 
             <form method="POST" action="{{ route('logout') }}" class="p-3 border-t border-slate-100">
                 @csrf
-                <button type="submit" class="w-full text-left rounded-sm px-3 py-2 text-body-md text-slate-600 hover:bg-slate-50">Sign out</button>
+                <button type="submit" class="w-full flex items-center gap-2.5 rounded-sm px-3 py-2 text-body-md text-slate-600 hover:bg-slate-50"><x-icon name="sign-out" class="w-5 h-5 shrink-0" />Sign out</button>
             </form>
         </aside>
 
         <div class="flex-1 min-w-0">
             <header class="h-[72px] bg-slate-0 border-b border-slate-100 flex items-center justify-between px-6">
                 <h1 class="text-heading-md font-display text-slate-900">{{ $title }}</h1>
-                <span class="text-body-sm text-slate-500">{{ $user?->name }}</span>
+                <div class="flex items-center gap-2.5">
+                    <span class="text-body-sm text-slate-500">{{ $user?->name }}</span>
+                    <span class="w-8 h-8 rounded-full bg-blue-50 text-blue-600 text-body-sm font-semibold flex items-center justify-center" aria-hidden="true">
+                        {{ Str::of($user?->name ?? '?')->substr(0, 1)->upper() }}
+                    </span>
+                </div>
             </header>
 
             <main class="p-6">

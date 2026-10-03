@@ -62,6 +62,29 @@ return [
         'return_url' => env('PAYNOW_RETURN_URL'),
     ],
 
+    // Shared by two sign-in flows using the same Google/Facebook app:
+    // the web's "Continue with Google/Facebook" (App\Http\Controllers\
+    // Auth\SocialLoginController), a real server-redirect OAuth flow,
+    // and the mobile API's (App\Http\Controllers\Api\V1\
+    // SocialAuthController), which never redirects — the app signs in
+    // natively on-device and sends the resulting provider access token
+    // here instead. 'redirect' below is a fallback only; the web
+    // controller always overrides it at call time via Socialite's own
+    // ->redirectUrl(route('social.callback', $provider)), since the
+    // callback URL depends on this app's own domain, not something a
+    // static config value could know in every environment.
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_REDIRECT_URI', '/auth/google/callback'),
+    ],
+
+    'facebook' => [
+        'client_id' => env('FACEBOOK_CLIENT_ID'),
+        'client_secret' => env('FACEBOOK_CLIENT_SECRET'),
+        'redirect' => env('FACEBOOK_REDIRECT_URI', '/auth/facebook/callback'),
+    ],
+
     // TDD §5/§8.4: the AI platform layer's provider boundary
     // (App\Contracts\Ai\LlmProvider / EmbeddingProvider). Provider-
     // agnostic by design — swapping vendors is a config change, not a

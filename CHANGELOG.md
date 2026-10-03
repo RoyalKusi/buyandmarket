@@ -3,6 +3,153 @@
 All notable changes to BuyAndMarket v2 are documented here, grouped by
 build run (see `docs/adr/` for the architectural decisions behind them).
 
+## Web: Google/Facebook sign-in, a dashboard icon pass, and dropping mobile's Search tab
+
+### Added — web "Continue with Google/Facebook"
+
+Extracted the find-or-create logic the mobile API's social sign-in
+(`SocialAuthController`) already had into `App\Services\
+SocialAccountResolver`, then built a second, real OAuth consumer on
+top of it: `App\Http\Controllers\Auth\SocialLoginController`
+(`GET /auth/{google,facebook}/redirect`, `/callback`, guest-only) —
+the server-redirect flow Socialite is actually built for, unlike the
+mobile API's token-based one (a mobile client has no browser session
+to redirect through). Both now share one account-resolution rule set
+with zero duplicated logic. `config/services.php`'s `google`/
+`facebook` redirect fallbacks now point at the real callback routes
+(previously unused placeholders, since only the token-based mobile
+flow existed); the controller always overrides them at call time via
+`->redirectUrl(route('social.callback', $provider))` regardless, since
+only that depends on this app's own domain. "Continue with
+Google/Facebook" buttons (`x-social-login-buttons`, with proper brand
+SVG marks) added to both `auth.login` and `auth.register` — same
+find-or-create account, so nothing separate to offer on register.
+6 tests in `tests/Feature/Auth/SocialLoginTest.php`. Same credentials
+as mobile's — `.env.example` and `mobile/README.md` both updated to
+cover the web redirect URIs that now need registering too.
+
+### Added — a dashboard-wide icon pass
+
+The entire dashboard sidebar (`components/layouts/dashboard.blade.php`
+— the one shared shell every buyer/seller/shipper/admin page sits in)
+had no icons at all, just plain text links. New `<x-icon>` component
+(Heroicons-outline-style inline SVGs, matching the header's existing
+hand-drawn cart icon) now labels every nav item — Orders, Addresses,
+Wishlist, Assistant, Security, each seller/shipper/admin section, Sign
+out — plus a profile-initial avatar next to the user's name in the
+header. Also added: an icon to the "Ask BM Assistant" link on the
+product page; map-pin/trash icons on the addresses page; trash icons
+on the wishlist remove buttons; and empty-state icons (orders,
+addresses, wishlist) in place of bare text.
+
+### Changed — mobile: dropped the bottom-nav Search tab
+
+Now that every other tab shows a persistent top search bar (added in
+the previous mobile pass), a separate Search entry in the bottom nav
+duplicated that same affordance. `AppShell` now shows four tabs (Home,
+Cart, Orders, Wishlist) instead of five; `/search` is still a real
+route, reachable only via the top bar's search pill — not a second,
+redundant way to reach the same screen.
+
+### Verified
+
+- Backend: full suite 236 passed (800 assertions, up from 230/760).
+  Pint clean. `vendor/bin/phpstan analyse`: 0 errors.
+- Mobile: `flutter analyze` clean, `flutter test` passing.
+- Manually confirmed `GET /auth/google/redirect` and `/auth/facebook/
+  redirect` build correct real authorization URLs (accounts.google.com
+  / facebook.com) with the right dynamically-computed callback
+  `redirect_uri` baked in — the whole flow is ready to go the moment
+  real credentials replace the placeholders, no further code changes
+  needed.
+- Visually walked the login/register pages (both social buttons
+  render with correct brand colours/marks) and the full dashboard
+  sidebar as a buyer (every icon renders correctly across Orders,
+  Addresses — including its empty/non-empty states and remove
+  buttons — and Wishlist), plus the mobile app's updated 4-tab bottom
+  nav via its web build against the live local backend.
+
+## Mobile: persistent top bar (logo/search/account), an account area, and Google/Facebook sign-in
+
+Scope: taking the Flutter buyer app from "the five core screens" toward
+feature-complete — a persistent top bar matching the web storefront's
+own header (logo, search, account), a real account area (profile,
+addresses, sign out), and native Google/Facebook sign-in end to end.
+
+### Added — persistent top bar + account area
+
+- `AppTopBar` (shown by `AppShell` on every tab except Search): the real
+  BuyAndMarket logo (`assets/images/logo.png`, copied from
+  `public/images/logo-blue.png` — the app had never used it anywhere
+  before this), a tappable search pill that pushes `/search`, and an
+  account icon/avatar that pushes `/account`. A pushed, non-tab-root
+  screen within the shell (currently just category) gets a back arrow
+  in place of the logo instead, since moving each screen's own app bar
+  into this shared one also removed its back affordance.
+- `/account` (`AccountScreen`): guest view with a sign-in/create-account
+  prompt, or a signed-in view with the buyer's name/email/avatar and
+  links to Orders, Wishlist, Addresses, and Sign out.
+- `/account/addresses` (`AddressesScreen`, auth-gated): list + delete +
+  a bottom-sheet add form over the existing address API — previously
+  only reachable mid-checkout, with no way to manage addresses outside
+  that flow.
+- `AccountButton` also sits in the Search tab's own app bar, so account
+  access is reachable from every tab, not just the other four.
+
+### Added — Google / Facebook sign-in, end to end
+
+New backend `App\Http\Controllers\Api\V1\SocialAuthController`
+(`POST /api/v1/auth/google`, `/facebook`, both public): the app
+performs sign-in natively on-device, then sends the resulting provider
+access token here. Verified via Socialite's stateless
+`userFromToken()` against each provider's own userinfo/Graph API
+endpoint — deliberately not the server-redirect flow Socialite is
+usually used for, since a mobile client has no browser session to
+redirect through. A returning social user is matched by provider ID;
+a first sign-in links an existing email/password account by email, or
+creates a new buyer account (email pre-verified — the provider already
+proved ownership) with an unusable random password. Facebook accounts
+with no accessible email are rejected with a clear message rather than
+silently mismatched. New `google_id`/`facebook_id`/`avatar_url`
+columns on `users`; 6 tests in `tests/Feature/Api/SocialAuthApiTest.php`
+(new account, existing social user, linking by email, both providers,
+missing-email rejection, invalid-token rejection).
+
+Mobile: `SocialAuthService` wraps `google_sign_in`/
+`flutter_facebook_auth`'s native sign-in sheets; `AuthRepository`/
+`AuthNotifier` gained `loginWithGoogle()`/`loginWithFacebook()`
+exchanging the resulting token with the new endpoints, sharing the
+exact same `{data, token}` response handling as email/password login.
+`SocialSignInButtons` (branded "Continue with Google/Facebook" buttons)
+sits on both the login and register screens — the backend's
+find-or-create means there's nothing separate to offer on register.
+
+Android (`AndroidManifest.xml`, a new `facebook_strings.xml`) and iOS
+(`Info.plist`) both got the native config Facebook Login and Google
+Sign-In need (meta-data, intent filters, URL schemes, `GIDClientID`) —
+all placeholder values, since this requires registering real apps in
+Google Cloud Console and Meta for Developers that only the project
+owner can create. `mobile/README.md` now documents exactly what to
+register and where each value goes; **sign-in will not work until
+real credentials replace the placeholders.**
+
+### Verified
+
+- Backend: full suite 230 passed (760 assertions, up from 224/722).
+  Pint clean. `vendor/bin/phpstan analyse`: 0 errors.
+- Mobile: `flutter analyze` clean, `flutter test` passing (updated to
+  match the new top bar). Walked the redesigned app end to end via its
+  web build against the live local backend: home (logo/search
+  pill/account icon), category (back-arrow variant), search (with its
+  own account icon), guest account view → login screen showing the
+  social buttons correctly rendered, signed-in account view
+  (avatar/menu), addresses screen (existing address, add form), and
+  cart — all correct against real seeded data.
+- Google/Facebook sign-in itself could not be exercised end-to-end here
+  — it needs real provider credentials (none exist in this sandbox) and
+  native sign-in sheets a browser-based build can't drive the same way;
+  the backend half is fully covered by the 6 new tests above instead.
+
 ## Comprehensive web + mobile QA pass — one site-wide web bug, three mobile bugs
 
 Scope: a full visual and functional check of both the storefront and

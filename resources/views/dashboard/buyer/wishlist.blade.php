@@ -1,6 +1,9 @@
 <x-layouts.dashboard title="Wishlist" active="wishlist">
     @if ($items->isEmpty())
-        <p class="text-body-lg text-slate-500">Nothing saved yet — tap the heart on a product page to add it here.</p>
+        <div class="text-center py-16">
+            <x-icon name="heart" class="w-12 h-12 mx-auto text-slate-300" />
+            <p class="mt-3 text-body-lg text-slate-500">Nothing saved yet — tap the heart on a product page to add it here.</p>
+        </div>
     @else
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             @foreach ($items as $item)
@@ -19,7 +22,7 @@
                         <form method="POST" action="{{ route('dashboard.wishlist.destroy', $product) }}" class="mt-2">
                             @csrf
                             @method('DELETE')
-                            <button type="submit" class="text-body-sm text-red-600 hover:underline">Remove</button>
+                            <button type="submit" class="inline-flex items-center gap-1 text-body-sm text-red-600 hover:underline"><x-icon name="trash" class="w-4 h-4" />Remove</button>
                         </form>
                     </div>
                 </div>

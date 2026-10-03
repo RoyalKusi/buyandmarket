@@ -8,10 +8,13 @@ import '../core/api/repositories/catalogue_repository.dart';
 import '../core/api/repositories/checkout_repository.dart';
 import '../core/api/repositories/order_repository.dart';
 import '../core/api/repositories/wishlist_repository.dart';
+import '../core/auth/social_auth_service.dart';
 import '../core/config.dart';
 import '../core/storage/token_storage.dart';
 
 final tokenStorageProvider = Provider<TokenStorage>((ref) => TokenStorage());
+
+final socialAuthServiceProvider = Provider<SocialAuthService>((ref) => SocialAuthService());
 
 final apiClientProvider = Provider<ApiClient>((ref) {
   return ApiClient(baseUrl: AppConfig.apiBaseUrl, tokenStorage: ref.watch(tokenStorageProvider));

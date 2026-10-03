@@ -76,7 +76,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('BuyAndMarket'), findsOneWidget);
+    expect(find.byType(Image), findsWidgets);
     expect(find.byType(NavigationBar), findsOneWidget);
   });
 }

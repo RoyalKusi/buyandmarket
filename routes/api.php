@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\V1\Seller\ProductImageController as SellerProductIm
 use App\Http\Controllers\Api\V1\Seller\ShipmentController as SellerShipmentController;
 use App\Http\Controllers\Api\V1\Shipper\OnboardingController as ShipperOnboardingController;
 use App\Http\Controllers\Api\V1\Shipper\ShipmentController as ShipperShipmentController;
+use App\Http\Controllers\Api\V1\SocialAuthController;
 use App\Http\Controllers\Api\V1\StoreDeliveryRateCardController;
 use App\Http\Controllers\Api\V1\Webhooks\PaymentWebhookController;
 use App\Http\Controllers\Api\V1\WishlistController;
@@ -38,6 +39,8 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::post('/login', [AuthController::class, 'login'])->name('login');
         Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->name('forgot-password');
         Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('reset-password');
+        Route::post('/google', [SocialAuthController::class, 'google'])->name('google');
+        Route::post('/facebook', [SocialAuthController::class, 'facebook'])->name('facebook');
 
         Route::middleware('auth:sanctum')->group(function () {
             Route::post('/logout', [AuthController::class, 'logout'])->name('logout');

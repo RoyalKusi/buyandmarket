@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Facebook Login (flutter_facebook_auth) needs these three values from
+    the app's dashboard at developers.facebook.com — Settings > Basic for
+    the App ID and Client Token, same values as FACEBOOK_CLIENT_ID /
+    FACEBOOK_CLIENT_SECRET's counterpart in the backend's .env (the
+    Client Token is NOT the App Secret — it's a separate, public-safe
+    value from the same Basic Settings page, under "Client Token").
+
+    Replace the three placeholder values below with real ones before
+    building a release — Facebook Login does not work with placeholders.
+-->
+<resources>
+    <!-- Not otherwise defined anywhere in this Flutter project (the
+         manifest sets the launcher label directly) — needed here only
+         because com.facebook.FacebookActivity requires an android:label. -->
+    <string name="app_name">BuyAndMarket</string>
+    <string name="facebook_app_id">YOUR_FACEBOOK_APP_ID</string>
+    <string name="facebook_client_token">YOUR_FACEBOOK_CLIENT_TOKEN</string>
+    <string name="fb_login_protocol_scheme">fbYOUR_FACEBOOK_APP_ID</string>
+</resources>

@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../providers/auth_provider.dart';
+import '../../screens/account/account_screen.dart';
+import '../../screens/account/addresses_screen.dart';
 import '../../screens/auth/login_screen.dart';
 import '../../screens/auth/register_screen.dart';
 import '../../screens/cart/cart_screen.dart';
@@ -19,7 +21,7 @@ import '../../screens/wishlist/wishlist_screen.dart';
 /// Screens behind this only make sense for a signed-in buyer; an
 /// unauthenticated visitor hitting any of them is bounced to login
 /// with `redirect` set so they land back where they meant to go.
-const _authGatedPaths = ['/cart', '/checkout', '/orders', '/wishlist'];
+const _authGatedPaths = ['/cart', '/checkout', '/orders', '/wishlist', '/account/addresses'];
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -76,6 +78,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => LoginScreen(redirectTo: state.uri.queryParameters['redirect']),
       ),
       GoRoute(path: '/register', builder: (context, state) => const RegisterScreen()),
+      GoRoute(path: '/account', builder: (context, state) => const AccountScreen()),
+      GoRoute(path: '/account/addresses', builder: (context, state) => const AddressesScreen()),
     ],
   );
 });

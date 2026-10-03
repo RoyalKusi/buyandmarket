@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/social_sign_in_buttons.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -119,6 +120,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 TextButton(
                   onPressed: () => context.pop(),
                   child: const Text('Already have an account? Sign in'),
+                ),
+                const OrDivider(),
+                SocialSignInButtons(
+                  onSignedIn: () => context.go('/'),
+                  onError: (message) => setState(() => _errorMessage = message),
                 ),
               ],
             ),

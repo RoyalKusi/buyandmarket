@@ -74,7 +74,8 @@
                      context (App\Services\Ai\AssistantService already
                      accepts context_type/context_id, wired end to end
                      here for the first time). --}}
-                <a href="{{ route('dashboard.assistant', ['product' => $product->id]) }}" class="mt-3 block text-center text-body-sm text-blue-600 hover:underline">
+                <a href="{{ route('dashboard.assistant', ['product' => $product->id]) }}" class="mt-3 flex items-center justify-center gap-1.5 text-body-sm text-blue-600 hover:underline">
+                    <x-icon name="chat" class="w-4 h-4" />
                     Ask BM Assistant about this product
                 </a>
             </div>

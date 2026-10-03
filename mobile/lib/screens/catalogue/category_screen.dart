@@ -14,9 +14,19 @@ class CategoryScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final catalogue = ref.watch(catalogueRepositoryProvider);
 
-    return Scaffold(
-      appBar: AppBar(title: Text(categoryName ?? 'Category')),
-      body: ProductGridView(fetchPage: (page) => catalogue.products(categoryId: categoryId, sort: 'newest', page: page)),
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(categoryName ?? 'Category', style: Theme.of(context).textTheme.headlineSmall),
+          ),
+        ),
+        Expanded(
+          child: ProductGridView(fetchPage: (page) => catalogue.products(categoryId: categoryId, sort: 'newest', page: page)),
+        ),
+      ],
     );
   }
 }
